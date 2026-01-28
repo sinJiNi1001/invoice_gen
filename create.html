@@ -1,0 +1,280 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container-fluid">
+    <div class="card shadow-sm border-0 mb-5 no-print">
+        <div class="card-header bg-info text-black d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Create New Invoice</h5>
+            <small>Valency Networks - Billing Module</small>
+        </div>
+        <div class="card-body">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                  </div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
+
+            <form action="{{ url_for('create_invoice') }}" method="POST">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="fw-bold small">INVOICE NUMBER</label>
+                        <div class="input-group">
+                            <input type="text" name="invoice_number" id="invoice_number" class="form-control fw-bold text-primary bg-light" value="{{ suggested_no }}" readonly required>
+                            <button class="btn btn-outline-secondary" type="button" onclick="toggleEdit()" title="Edit manually">🔓</button>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="fw-bold small">INVOICE DATE</label>
+                        <input type="date" name="invoice_date" id="invoice_date" class="form-control" required oninput="syncPreview()">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="fw-bold small">DUE DATE</label>
+                        <input type="date" name="due_date" class="form-control">
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="fw-bold small">CUSTOMER</label>
+                        <select name="customer_id" id="customer_id" class="form-select" required onchange="syncPreview()">
+                            <option value="">Select Customer...</option>
+                            {% for c in customers %}
+                                <option value="{{c.id}}" data-currency="{{c.currency}}" data-name="{{c.company_name}}" data-address="{{c.address}}" data-taxid="{{c.tax_id}}">{{c.company_name}}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="fw-bold small">PROJECT</label>
+                        <select name="project_id" id="project_id" class="form-select" required onchange="syncPreview()">
+                            <option value="">Select Project...</option>
+                            {% for p in projects %}
+                            <option value="{{p.id}}" data-name="{{p.project_name}}">{{p.project_name}}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="fw-bold small">PAYMENT SLAB / MILESTONE</label>
+                        <select name="slab_id" id="slab_id" class="form-select" onchange="syncPreview()">
+                            <option value="">Select Slab (Optional)...</option> 
+                            {% for s in slabs %}
+                                <option value="{{s.id}}" data-name="{{s.slab_name}}">{{s.slab_name}}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row mb-4 p-3 bg-light border rounded">
+                    <div class="col-md-3">
+                        <label class="fw-bold small">BASE AMOUNT (<span id="currency_label">---</span>)</label>
+                        <input type="number" step="0.01" name="invoice_amount" id="base_amount" class="form-control border-primary" placeholder="0.00" required oninput="calculateInvoice()">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="fw-bold small">TAX TYPE</label>
+                        <select name="tax_type" id="tax_type" class="form-select" onchange="calculateInvoice()">
+                            <option value="GST">GST (18% Total)</option>
+                            <option value="IGST">IGST (18%)</option>
+                            <option value="NONE">NONE (0%)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="fw-bold small">TAX AMOUNT</label>
+                        <input type="number" step="0.01" name="tax_amount" id="tax_amount" class="form-control bg-white" readonly>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="fw-bold small">TOTAL (<span id="currency_total">---</span>)</label>
+                        <input type="number" step="0.01" name="total_amount" id="total_amount" class="form-control bg-white fw-bold text-primary" readonly>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-primary px-4" onclick="window.print()">Print Preview</button>
+                    <button type="submit" class="btn btn-success px-5 shadow">Save Invoice</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="invoice-box container my-5 p-5 bg-white border shadow-sm" id="printableInvoice">
+    
+    <div class="d-flex align-items-center mb-4" style="border-bottom: 2px solid #000; padding-bottom: 10px;">
+        <div style="flex: 1;"></div> 
+        
+        <h3 class="text-center fw-bold text-uppercase mb-0" style="letter-spacing: 2px; flex: 2;">
+            Tax Invoice
+        </h3>
+        
+        <div style="flex: 1; text-align: right;">
+            <img src="{{ url_for('static', filename='logo.png') }}" 
+                 alt="Company Logo" 
+                 style="max-height: 50px; width: auto;">
+        </div>
+    </div>
+        <div class="row mb-5">
+            <div class="col-6">
+                <p class="mb-1 fw-bold text-muted small">TO:</p>
+                <h5 class="fw-bold mb-1" id="p_customer_name">Customer Name</h5>
+                 <h5 class="fw-bold mb-1" id="p_customer_address">Customer Address</h5>
+                <p class="text-muted small mb-0" id="p_customer_address">
+                    Customer Address<br>
+                    Country
+                </p>
+            </div>
+
+            <div class="col-6 text-end">
+                <p class="mb-2"><strong>GSTIN:</strong> <span id="p_customer_gst">---</span></p>
+                <div class="bg-light p-2 border">
+                    <p class="mb-1"><strong>Invoice Number:</strong> <span id="p_invoice_no">{{ suggested_no }}</span></p>
+                    <p class="mb-0"><strong>Invoice Date:</strong> <span id="p_invoice_date">YYYY-MM-DD</span></p>
+                </div>
+            </div>
+        </div>
+
+        <table class="table table-bordered align-middle">
+            <thead class="bg-dark text-white text-center">
+                <tr>
+                    <th style="width: 10%;">Count</th>
+                    <th style="width: 65%;">Description</th>
+                    <th style="width: 25%;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="text-center">1</td>
+                    <td>
+                        <div class="fw-bold" id="p_table_company">Company Name</div>
+                        <div class="text-muted small">
+                            Project: <span id="p_table_project">---</span><br>
+                            Milestone: <span id="p_table_slab">Full Payment</span>
+                        </div>
+                    </td>
+                    <td class="text-end fw-bold">
+                        <span class="p_curr">INR</span> <span id="p_base_amt_display">0.00</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2" class="text-end fw-bold">Base Amount</td>
+                    <td class="text-end" id="p_base_amt_val">0.00</td>
+                </tr>
+                <tr>
+                    <td colspan="2" class="text-end fw-bold"><span id="p_tax_type">GST</span> (18%)</td>
+                    <td class="text-end" id="p_tax_amt_val">0.00</td>
+                </tr>
+                <tr class="table-dark">
+                    <td colspan="2" class="text-end fw-bold">Grand Total</td>
+                    <td class="text-end fw-bold"><span class="p_curr">INR</span> <span id="p_total_amt_val">0.00</span></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="mt-5 pt-4 border-top">
+            <div class="row">
+                <div class="col-8 small text-muted">
+                    <p class="mb-0"><strong>Terms & Conditions:</strong></p>
+                    <p>Payment is due within 15 days. Please include invoice number on your check.</p>
+                </div>
+                <div class="col-4 text-center">
+                    <p class="mb-5 small text-muted">For Valency Networks</p>
+                    <div style="border-top: 1px solid #000; margin-top: 40px;">Authorised Signatory</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const baseInput = document.getElementById('base_amount');
+    const taxTypeSelect = document.getElementById('tax_type');
+    const taxAmountInput = document.getElementById('tax_amount');
+    const totalAmountInput = document.getElementById('total_amount');
+    const customerSelect = document.getElementById('customer_id');
+    
+    function toggleEdit() 
+    {
+        const input = document.getElementById('invoice_number');
+        input.readOnly = !input.readOnly;
+        input.classList.toggle('bg-light');
+        syncPreview();
+    }
+
+    function syncPreview() {
+        // Sync Basic Details
+        document.getElementById('p_invoice_no').innerText = document.getElementById('invoice_number').value;
+        document.getElementById('p_invoice_date').innerText = document.getElementById('invoice_date').value;
+
+        // Sync Customer Details
+        const cOpt = customerSelect.options[customerSelect.selectedIndex];
+        if(cOpt.value) {
+            document.getElementById('p_customer_name').innerText = cOpt.dataset.name;
+            document.getElementById('p_table_company').innerText = cOpt.dataset.name;
+            document.getElementById('p_customer_address').innerText = cOpt.dataset.address;
+            document.getElementById('p_customer_gst').innerText = cOpt.dataset.taxid || 'N/A';
+            
+            const curr = cOpt.dataset.currency || 'INR';
+            document.getElementById('currency_label').innerText = curr;
+            document.getElementById('currency_total').innerText = curr;
+            document.querySelectorAll('.p_curr').forEach(el => el.innerText = curr);
+        }
+
+        // Sync Project/Slab
+        const pOpt = document.getElementById('project_id').options[document.getElementById('project_id').selectedIndex];
+        document.getElementById('p_table_project').innerText = pOpt.value ? pOpt.dataset.name : '---';
+        
+        const sOpt = document.getElementById('slab_id').options[document.getElementById('slab_id').selectedIndex];
+        document.getElementById('p_table_slab').innerText = sOpt.value ? sOpt.dataset.name : 'Full Payment';
+
+        calculateInvoice();
+    }
+
+    function calculateInvoice() {
+        const baseValue = parseFloat(baseInput.value) || 0;
+        const selectedTax = taxTypeSelect.value;
+        let taxRate = (selectedTax === 'NONE') ? 0 : 0.18;
+
+        const calculatedTax = baseValue * taxRate;
+        const calculatedTotal = baseValue + calculatedTax;
+
+        // Update Inputs
+        taxAmountInput.value = calculatedTax.toFixed(2);
+        totalAmountInput.value = calculatedTotal.toFixed(2);
+
+        // Update Preview Table
+        document.getElementById('p_tax_type').innerText = selectedTax;
+        document.getElementById('p_base_amt_display').innerText = baseValue.toLocaleString('en-IN', {minimumFractionDigits: 2});
+        document.getElementById('p_base_amt_val').innerText = baseValue.toLocaleString('en-IN', {minimumFractionDigits: 2});
+        document.getElementById('p_tax_amt_val').innerText = calculatedTax.toLocaleString('en-IN', {minimumFractionDigits: 2});
+        document.getElementById('p_total_amt_val').innerText = calculatedTotal.toLocaleString('en-IN', {minimumFractionDigits: 2});
+    }
+
+    // Set default date
+    document.getElementById('invoice_date').valueAsDate = new Date();
+    syncPreview();
+</script>
+
+<style>
+    .invoice-box {
+        max-width: 850px;
+        min-height: 1000px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    label { color: #555; margin-bottom: 5px; }
+    input[readonly] { background-color: #f8f9fa !important; }
+    
+    @media print {
+        body * { visibility: hidden; }
+        .no-print { display: none !important; }
+        #printableInvoice, #printableInvoice * { visibility: visible; }
+        #printableInvoice {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            border: none !important;
+            box-shadow: none !important;
+        }
+    }
+</style>
+{% endblock %}
