@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container" style="max-width: 900px;">
+    
+    <form method="POST" action="{{ url_for('edit_customer', id=customer.id) if customer else url_for('create_customer') }}">
+        
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h4 class="mb-0">{{ 'Edit' if customer else 'Create' }} Customer Details</h4>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-12">
+                        <label class="form-label">Company Name <span class="text-danger">*</span></label>
+                        <input type="text" name="company_name" class="form-control" required 
+                               value="{{ customer.company_name if customer else '' }}">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Country</label>
+                        <select name="country" id="country" class="form-select" onchange="updateCurrency()">
+                            <option value="India" {% if customer and customer.country == 'India' %}selected{% endif %}>India</option>
+                            <option value="USA" {% if customer and customer.country == 'USA' %}selected{% endif %}>USA</option>
+                            <option value="UK" {% if customer and customer.country == 'UK' %}selected{% endif %}>UK</option>
+                            <option value="UAE" {% if customer and customer.country == 'UAE' %}selected{% endif %}>UAE</option>
+                            <option value="Singapore" {% if customer and customer.country == 'Singapore' %}selected{% endif %}>Singapore</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Currency</label>
+                        <input type="text" name="currency" id="currency" class="form-control" 
+                               value="{{ customer.currency if customer else 'INR' }}">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-control" value="{{ customer.email if customer else '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Phone</label>
+                        <input type="text" name="phone" class="form-control" value="{{ customer.phone if customer else '' }}">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Address</label>
+                        <textarea name="address" class="form-control" rows="2">{{ customer.address if customer else '' }}</textarea>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Tax ID (GST/VAT)</label>
+                        <input type="text" name="tax_id" class="form-control" value="{{ customer.tax_id if customer else '' }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if not customer %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0 text-primary">Initial Projects</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-bordered" id="newProjectsTable">
+                    <thead>
+                        <tr>
+                            <th>Project Name</th>
+                            <th style="width: 150px;">Value</th>
+                            <th style="width: 150px;">Status</th>
+                            <th style="width: 50px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        </tbody>
+                </table>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addNewProjectRow()">+ Add Project Row</button>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="d-flex justify-content-end mb-5">
+            <a href="{{ url_for('list_customers') }}" class="btn btn-light border me-2">Cancel</a>
+            <button type="submit" class="btn btn-primary px-4">Save All Details</button>
+        </div>
+    </form>
+
+
+    {% if customer %}
+    <div class="card shadow-sm border-top-primary">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 text-primary">Manage Existing Projects</h5>
+        </div>
+        <div class="card-body">
+            
+            <form action="{{ url_for('add_project_to_customer', id=customer.id) }}" method="POST" class="row g-2 align-items-end mb-4 border-bottom pb-4">
+                <div class="col-md-5">
+                    <label class="form-label small fw-bold">New Project Name</label>
+                    <input type="text" name="project_name" class="form-control form-control-sm" placeholder="e.g. ERP Setup" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">Value</label>
+                    <input type="number" name="total_value" class="form-control form-control-sm" placeholder="0.00" required>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">Status</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="Active">Active</option>
+                        <option value="Completed">Completed</option>
+                        <option value="On Hold">On Hold</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-sm btn-success w-100">+ Add</button>
+                </div>
+            </form>
+
+            {% if projects %}
+            <table class="table table-bordered table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Project Name</th>
+                        <th>Status</th>
+                        <th>Value</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in projects %}
+                    <tr>
+                        <td>{{ p.project_name }}</td>
+                        <td>
+                            {% if p.status == 'Active' %}<span class="badge bg-success">Active</span>
+                            {% elif p.status == 'Completed' %}<span class="badge bg-primary">Completed</span>
+                            {% else %}<span class="badge bg-warning text-dark">On Hold</span>{% endif %}
+                        </td>
+                        <td>{{ "{:,.2f}".format(p.total_value) }} {{ customer.currency }}</td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-sm btn-outline-primary me-1"
+                                    onclick="openEditProjectModal('{{ p.id }}', '{{ p.project_name }}', '{{ p.total_value }}', '{{ p.status }}')">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                            <a href="{{ url_for('delete_project', cust_id=customer.id, proj_id=p.id) }}" 
+                               class="btn btn-sm btn-outline-danger"
+                               onclick="return confirm('Delete this project?');">
+                                <i class="fa-solid fa-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+                <div class="alert alert-light text-center border">No projects found. Add one above.</div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="modal fade" id="editProjectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Project</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editProjectForm" method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="customer_id" value="{{ customer.id if customer else '' }}">
+                    <div class="mb-3">
+                        <label class="form-label">Project Name</label>
+                        <input type="text" name="project_name" id="editProjName" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Total Value</label>
+                        <input type="number" name="total_value" id="editProjValue" class="form-control" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Status</label>
+                        <select name="status" id="editProjStatus" class="form-select">
+                            <option value="Active">Active</option>
+                            <option value="Completed">Completed</option>
+                            <option value="On Hold">On Hold</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Currency Logic
+    const currencyMap = { 'India': 'INR', 'USA': 'USD', 'UK': 'GBP', 'UAE': 'AED', 'Singapore': 'SGD' };
+    function updateCurrency() {
+        const country = document.getElementById('country').value;
+        const currencyInput = document.getElementById('currency');
+        if (currencyMap[country]) currencyInput.value = currencyMap[country];
+    }
+
+    // Logic for ADDING rows in Create Mode
+    function addNewProjectRow() {
+        const tbody = document.querySelector('#newProjectsTable tbody');
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><input type="text" name="new_project_names[]" class="form-control form-control-sm" placeholder="Name" required></td>
+            <td><input type="number" name="new_project_values[]" class="form-control form-control-sm" placeholder="0.00" required></td>
+            <td>
+                <select name="new_project_statuses[]" class="form-select form-select-sm">
+                    <option value="Active">Active</option>
+                    <option value="Completed">Completed</option>
+                    <option value="On Hold">On Hold</option>
+                </select>
+            </td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">X</button></td>
+        `;
+        tbody.appendChild(row);
+    }
+
+    // Logic for OPENING the Edit Modal
+    function openEditProjectModal(id, name, value, status) {
+        document.getElementById('editProjName').value = name;
+        document.getElementById('editProjValue').value = value;
+        document.getElementById('editProjStatus').value = status;
+        
+        // Dynamically set the form action to: /projects/<id>/update
+        document.getElementById('editProjectForm').action = "/projects/" + id + "/update";
+        
+        const myModal = new bootstrap.Modal(document.getElementById('editProjectModal'));
+        myModal.show();
+    }
+</script>
+{% endblock %}
