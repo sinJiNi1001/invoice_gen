@@ -2,9 +2,9 @@ from flask import Flask, render_template, request, redirect, url_for
 import mysql.connector
 from typing import List, Dict, Any
 import os
+from datetime import date
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
@@ -35,16 +35,21 @@ def dashboard():
 
 @app.route('/customers')
 def list_customers():
+    # Get Filter Parameters
     search = request.args.get('search', '')
     country = request.args.get('country', '')
     sort_by = request.args.get('sort_by', 'newest')
+    filter_month = request.args.get('month', '')
+    filter_year = request.args.get('year', '')
     
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     
+    # Base Query
     query = "SELECT * FROM customers WHERE 1=1"
     params = []
     
+    # Apply Filters
     if search:
         query += " AND company_name LIKE %s"
         params.append(f"%{search}%")
@@ -52,9 +57,17 @@ def list_customers():
         query += " AND country = %s"
         params.append(country)
     
+    if filter_month:
+        query += " AND MONTH(joined_date) = %s"
+        params.append(filter_month)
+    if filter_year:
+        query += " AND YEAR(joined_date) = %s"
+        params.append(filter_year)
+    
+    # Apply Sorting
     if sort_by == 'name_asc': query += " ORDER BY company_name ASC"
-    elif sort_by == 'oldest': query += " ORDER BY id ASC"
-    else: query += " ORDER BY id DESC"
+    elif sort_by == 'oldest': query += " ORDER BY joined_date ASC"
+    else: query += " ORDER BY joined_date DESC"
     
     cursor.execute(query, tuple(params))
     customers = fetch_as_dict(cursor)
@@ -73,7 +86,15 @@ def list_customers():
                 cust['projects'] = [p for p in all_projects if str(p['customer_id']) == str(cust['id'])]
     
     conn.close()
-    return render_template('customer_list.html', customers=customers, search_term=search, country_filter=country, sort_by=sort_by)
+    
+    # Removed available_years passing since we hardcoded it in HTML
+    return render_template('customer_list.html', 
+                           customers=customers, 
+                           search_term=search, 
+                           country_filter=country, 
+                           sort_by=sort_by,
+                           filter_month=filter_month,
+                           filter_year=filter_year)
 
 @app.route('/customers/new', methods=('GET', 'POST'))
 def create_customer():
@@ -81,11 +102,13 @@ def create_customer():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # FIXED: Uses gst_number instead of tax_id
-        # FIXED: Includes deal_owner and gst_type
+        j_date = request.form.get('joined_date')
+        if not j_date or j_date.strip() == '':
+            j_date = date.today()
+
         cursor.execute("""
-            INSERT INTO customers (company_name, deal_owner, gst_type, gst_number, country, currency, email, phone, address)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO customers (company_name, deal_owner, gst_type, gst_number, country, currency, email, phone, address, joined_date, po_ref, notes)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             request.form['company_name'], 
             request.form.get('deal_owner'), 
@@ -95,12 +118,14 @@ def create_customer():
             request.form['currency'], 
             request.form.get('email'), 
             request.form.get('phone'), 
-            request.form.get('address')
+            request.form.get('address'),
+            j_date,
+            request.form.get('po_ref'),
+            request.form.get('notes')
         ))
         
         new_cust_id = cursor.lastrowid
 
-        # Insert Projects
         proj_names = request.form.getlist('new_project_names[]')
         proj_values = request.form.getlist('new_project_values[]')
         proj_statuses = request.form.getlist('new_project_statuses[]')
@@ -124,10 +149,12 @@ def edit_customer(id):
     cursor = conn.cursor(dictionary=True)
     
     if request.method == 'POST':
-        # FIXED: Updates gst_number, deal_owner, and gst_type
+        j_date = request.form.get('joined_date')
+        if not j_date or j_date.strip() == '': j_date = None
+
         cursor.execute("""
             UPDATE customers 
-            SET company_name=%s, deal_owner=%s, gst_type=%s, gst_number=%s, country=%s, currency=%s, email=%s, phone=%s, address=%s
+            SET company_name=%s, deal_owner=%s, gst_type=%s, gst_number=%s, country=%s, currency=%s, email=%s, phone=%s, address=%s, joined_date=%s, po_ref=%s, notes=%s
             WHERE id=%s
         """, (
             request.form['company_name'], 
@@ -139,6 +166,9 @@ def edit_customer(id):
             request.form.get('email'), 
             request.form.get('phone'), 
             request.form.get('address'), 
+            j_date,
+            request.form.get('po_ref'),
+            request.form.get('notes'),
             id
         ))
         conn.commit()
@@ -149,6 +179,10 @@ def edit_customer(id):
     rows = fetch_as_dict(cursor)
     customer = rows[0] if rows else None
     
+    # Ensure Date is String for HTML
+    if customer and customer.get('joined_date'):
+        customer['joined_date'] = str(customer['joined_date'])
+
     projects = []
     if customer:
         cursor.execute("SELECT * FROM projects WHERE customer_id = %s ORDER BY id DESC", (id,))
@@ -158,7 +192,7 @@ def edit_customer(id):
     return render_template('customer_form.html', customer=customer, projects=projects)
 
 # ==========================================
-# PROJECT ROUTES
+# PROJECT & INVOICE ROUTES
 # ==========================================
 
 @app.route('/customers/<int:id>/project/add', methods=['POST'])
@@ -186,25 +220,12 @@ def update_project(proj_id):
     conn.close()
     return redirect(url_for('edit_customer', id=cust_id))
 
-# ==========================================
-# INVOICE ROUTES (Placeholders to prevent crashing)
-# ==========================================
-
 @app.route('/invoices')
-def list_invoices():
-    return "<h1>Invoices Page</h1><p>Coming next...</p>"
-
+def list_invoices(): return "<h1>Invoices Page</h1><p>Coming next...</p>"
 @app.route('/invoices/new')
-def create_invoice():
-    return "<h1>Create Invoice</h1><p>Coming next...</p>"
-
+def create_invoice(): return "<h1>Create Invoice</h1><p>Coming next...</p>"
 @app.route('/invoices/edit')
-def edit_list():
-    return "<h1>Edit Invoice</h1><p>Coming next...</p>"
-
-# ==========================================
-# RUN APP
-# ==========================================
+def edit_list(): return "<h1>Edit Invoice</h1><p>Coming next...</p>"
 
 if __name__ == '__main__':
     app.run(debug=True, port=8000)

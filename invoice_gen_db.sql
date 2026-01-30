@@ -413,9 +413,9 @@ USE invoice_generator;
 -- 1. Insert Test Customers (with new columns like deal_owner, gst_type)
 INSERT INTO customers (company_name, deal_owner, gst_type, gst_number, country, currency, email, phone, address) 
 VALUES 
-('Pune CyberPark Pvt Ltd', 'Sinu', 'Yes', '27AAACP1234A1Z1', 'India', 'INR', 'finance@cyberpark.in', '9876543210', 'Magarpatta City, Pune, MH'),
+('Pune CyberPark Pvt Ltd', 'xxx', 'Yes', '27AAACP1234A1Z1', 'India', 'INR', 'finance@cyberpark.in', '9876543210', 'Magarpatta City, Pune, MH'),
 ('Global Shield Inc', 'Rahul', 'No_Forex', NULL, 'USA', 'USD', 'billing@globalshield.com', '+1-555-0199', '101 Silicon Valley, CA, USA'),
-('Bangalore Tech Hub', 'Sinu', 'Yes', '29BBBCS5678B2Z2', 'India', 'INR', 'accounts@bth.com', '9988776655', 'Electronic City, Bangalore, KA');
+('Bangalore Tech Hub', 'qrt', 'Yes', '29BBBCS5678B2Z2', 'India', 'INR', 'accounts@bth.com', '9988776655', 'Electronic City, Bangalore, KA');
 
 -- 2. Insert Test Projects (with new status options)
 -- Get IDs dynamically to avoid errors if IDs aren't 1, 2, 3
@@ -427,3 +427,19 @@ VALUES
 ((SELECT id FROM customers WHERE company_name='Bangalore Tech Hub'), 'Network Hardening', 150000.00, 'Duped');
 
 SELECT * FROM customers;
+
+USE invoice_generator;
+
+-- Add the new date column (Defaults to today if left empty)
+ALTER TABLE customers ADD COLUMN joined_date DATE DEFAULT (CURRENT_DATE);
+
+-- Optional: Update existing dummy data to have a date so they don't look broken
+UPDATE customers SET joined_date = '2025-01-15' WHERE id > 0;
+
+USE invoice_generator;
+
+-- Add PO/Reference Number column
+ALTER TABLE customers ADD COLUMN po_ref VARCHAR(100);
+
+-- Add Notes column
+ALTER TABLE customers ADD COLUMN notes TEXT;
