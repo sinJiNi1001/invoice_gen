@@ -71,23 +71,9 @@ def list_customers():
     
     cursor.execute(query, tuple(params))
     customers = fetch_as_dict(cursor)
-
-    # Attach Projects
-    if customers:
-        for c in customers: c['projects'] = []
-        cust_ids = [str(c['id']) for c in customers]
-        if cust_ids:
-            placeholders = ','.join(['%s'] * len(cust_ids))
-            sql = f"SELECT * FROM projects WHERE customer_id IN ({placeholders})"
-            cursor.execute(sql, tuple(cust_ids))
-            all_projects = fetch_as_dict(cursor)
-
-            for cust in customers:
-                cust['projects'] = [p for p in all_projects if str(p['customer_id']) == str(cust['id'])]
     
     conn.close()
     
-    # Removed available_years passing since we hardcoded it in HTML
     return render_template('customer_list.html', 
                            customers=customers, 
                            search_term=search, 
@@ -106,42 +92,43 @@ def create_customer():
         if not j_date or j_date.strip() == '':
             j_date = date.today()
 
+        # Logic: If status is NOT Registered, force gst_type to NULL
+        status = request.form.get('gst_status', 'Registered')
+        tax_type = request.form.get('gst_type') if status == 'Registered' else None
+
+        # REMOVED: po_ref
         cursor.execute("""
-            INSERT INTO customers (company_name, deal_owner, gst_type, gst_number, country, currency, email, phone, address, joined_date, po_ref, notes)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO customers (
+                company_name, first_name, last_name, 
+                email, phone, address, city, state, country, 
+                deal_owner, gst_status, gst_type, gst_number, currency, 
+                joined_date, notes
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             request.form['company_name'], 
-            request.form.get('deal_owner'), 
-            request.form.get('gst_type', 'Yes'), 
-            request.form.get('gst_number'),
-            request.form['country'], 
-            request.form['currency'], 
+            request.form.get('first_name'),
+            request.form.get('last_name'),
             request.form.get('email'), 
             request.form.get('phone'), 
             request.form.get('address'),
+            request.form.get('city'),
+            request.form.get('state'),
+            request.form['country'], 
+            request.form.get('deal_owner'), 
+            status,
+            tax_type,
+            request.form.get('gst_number'),
+            request.form['currency'], 
             j_date,
-            request.form.get('po_ref'),
             request.form.get('notes')
         ))
         
-        new_cust_id = cursor.lastrowid
-
-        proj_names = request.form.getlist('new_project_names[]')
-        proj_values = request.form.getlist('new_project_values[]')
-        proj_statuses = request.form.getlist('new_project_statuses[]')
-
-        for name, val, status in zip(proj_names, proj_values, proj_statuses):
-            if name.strip():
-                cursor.execute("""
-                    INSERT INTO projects (customer_id, project_name, total_value, status)
-                    VALUES (%s, %s, %s, %s)
-                """, (new_cust_id, name, val, status))
-
         conn.commit()
         conn.close()
         return redirect(url_for('list_customers'))
     
-    return render_template('customer_form.html', customer=None, projects=[])
+    return render_template('customer_form.html', customer=None)
 
 @app.route('/customers/<int:id>/edit', methods=('GET', 'POST'))
 def edit_customer(id):
@@ -152,22 +139,34 @@ def edit_customer(id):
         j_date = request.form.get('joined_date')
         if not j_date or j_date.strip() == '': j_date = None
 
+        # Logic: If status is NOT Registered, force gst_type to NULL
+        status = request.form.get('gst_status', 'Registered')
+        tax_type = request.form.get('gst_type') if status == 'Registered' else None
+
+        # REMOVED: po_ref
         cursor.execute("""
             UPDATE customers 
-            SET company_name=%s, deal_owner=%s, gst_type=%s, gst_number=%s, country=%s, currency=%s, email=%s, phone=%s, address=%s, joined_date=%s, po_ref=%s, notes=%s
+            SET company_name=%s, first_name=%s, last_name=%s, 
+                email=%s, phone=%s, address=%s, city=%s, state=%s, country=%s,
+                deal_owner=%s, gst_status=%s, gst_type=%s, gst_number=%s, currency=%s, 
+                joined_date=%s, notes=%s
             WHERE id=%s
         """, (
             request.form['company_name'], 
-            request.form.get('deal_owner'), 
-            request.form.get('gst_type'), 
-            request.form.get('gst_number'),
-            request.form['country'], 
-            request.form['currency'], 
+            request.form.get('first_name'),
+            request.form.get('last_name'),
             request.form.get('email'), 
             request.form.get('phone'), 
-            request.form.get('address'), 
+            request.form.get('address'),
+            request.form.get('city'),
+            request.form.get('state'),
+            request.form['country'], 
+            request.form.get('deal_owner'), 
+            status,
+            tax_type,
+            request.form.get('gst_number'),
+            request.form['currency'], 
             j_date,
-            request.form.get('po_ref'),
             request.form.get('notes'),
             id
         ))
@@ -179,47 +178,15 @@ def edit_customer(id):
     rows = fetch_as_dict(cursor)
     customer = rows[0] if rows else None
     
-    # Ensure Date is String for HTML
     if customer and customer.get('joined_date'):
         customer['joined_date'] = str(customer['joined_date'])
 
-    projects = []
-    if customer:
-        cursor.execute("SELECT * FROM projects WHERE customer_id = %s ORDER BY id DESC", (id,))
-        projects = fetch_as_dict(cursor)
-
     conn.close()
-    return render_template('customer_form.html', customer=customer, projects=projects)
+    return render_template('customer_form.html', customer=customer)
 
 # ==========================================
-# PROJECT & INVOICE ROUTES
+# PLACEHOLDER ROUTES (For Sidebar Links)
 # ==========================================
-
-@app.route('/customers/<int:id>/project/add', methods=['POST'])
-def add_project_to_customer(id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO projects (customer_id, project_name, total_value, status)
-        VALUES (%s, %s, %s, %s)
-    """, (id, request.form['project_name'], request.form['total_value'], request.form['status']))
-    conn.commit()
-    conn.close()
-    return redirect(url_for('edit_customer', id=id))
-
-@app.route('/projects/<int:proj_id>/update', methods=['POST'])
-def update_project(proj_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cust_id = request.form['customer_id']
-    cursor.execute("""
-        UPDATE projects SET project_name=%s, total_value=%s, status=%s
-        WHERE id=%s
-    """, (request.form['project_name'], request.form['total_value'], request.form['status'], proj_id))
-    conn.commit()
-    conn.close()
-    return redirect(url_for('edit_customer', id=cust_id))
-
 @app.route('/invoices')
 def list_invoices(): return "<h1>Invoices Page</h1><p>Coming next...</p>"
 @app.route('/invoices/new')
