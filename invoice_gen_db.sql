@@ -356,3 +356,74 @@ USE invoice_generator;
 
 ALTER TABLE projects
 ADD COLUMN status ENUM('Active', 'Completed', 'On Hold') DEFAULT 'Active';
+
+USE invoice_generator;
+
+-- 1. Rename 'tax_id' to 'gst_number'
+ALTER TABLE customers CHANGE COLUMN tax_id gst_number VARCHAR(50);
+
+-- 2. Add the 'deal_owner' column
+ALTER TABLE customers ADD COLUMN deal_owner VARCHAR(100) AFTER company_name;
+
+-- 3. Add the 'gst_type' dropdown logic
+ALTER TABLE customers ADD COLUMN gst_type ENUM('Yes', 'No_Forex', 'No_SEZ') DEFAULT 'Yes' AFTER deal_owner;
+
+USE invoice_generator;
+
+-- Update the status options to include 'Duped', 'Cancel', etc.
+ALTER TABLE projects MODIFY COLUMN status ENUM('Active', 'Duped', 'Cancel', 'On Hold', 'Complete') DEFAULT 'Active';
+
+USE invoice_generator;
+
+-- 1. Create the Customers table FIRST
+CREATE TABLE IF NOT EXISTS customers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    company_name VARCHAR(150) NOT NULL,
+    deal_owner VARCHAR(100),
+    gst_type ENUM('Yes', 'No_Forex', 'No_SEZ') DEFAULT 'Yes',
+    gst_number VARCHAR(50),
+    country VARCHAR(50),
+    currency VARCHAR(10) DEFAULT 'INR',
+    email VARCHAR(100),
+    phone VARCHAR(20),
+    address TEXT
+);
+
+-- 2. NOW create the Projects table
+CREATE TABLE IF NOT EXISTS projects (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT NOT NULL,
+    project_name VARCHAR(150) NOT NULL,
+    total_value DECIMAL(15,2) DEFAULT 0.00,
+    status ENUM('Active', 'Duped', 'Cancel', 'On Hold', 'Complete') DEFAULT 'Active',
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+);
+
+SHOW TABLES;
+DESCRIBE projects;
+
+DESCRIBE customers;
+
+SELECT * FROM customers;
+
+SELECT * FROM invoice_generator.customers;
+
+USE invoice_generator;
+
+-- 1. Insert Test Customers (with new columns like deal_owner, gst_type)
+INSERT INTO customers (company_name, deal_owner, gst_type, gst_number, country, currency, email, phone, address) 
+VALUES 
+('Pune CyberPark Pvt Ltd', 'Sinu', 'Yes', '27AAACP1234A1Z1', 'India', 'INR', 'finance@cyberpark.in', '9876543210', 'Magarpatta City, Pune, MH'),
+('Global Shield Inc', 'Rahul', 'No_Forex', NULL, 'USA', 'USD', 'billing@globalshield.com', '+1-555-0199', '101 Silicon Valley, CA, USA'),
+('Bangalore Tech Hub', 'Sinu', 'Yes', '29BBBCS5678B2Z2', 'India', 'INR', 'accounts@bth.com', '9988776655', 'Electronic City, Bangalore, KA');
+
+-- 2. Insert Test Projects (with new status options)
+-- Get IDs dynamically to avoid errors if IDs aren't 1, 2, 3
+INSERT INTO projects (customer_id, project_name, total_value, status) 
+VALUES 
+((SELECT id FROM customers WHERE company_name='Pune CyberPark Pvt Ltd'), 'Cloud Security Audit', 500000.00, 'Active'),
+((SELECT id FROM customers WHERE company_name='Pune CyberPark Pvt Ltd'), 'Annual VAPT', 250000.00, 'On Hold'),
+((SELECT id FROM customers WHERE company_name='Global Shield Inc'), 'Web App Pentest', 5000.00, 'Complete'),
+((SELECT id FROM customers WHERE company_name='Bangalore Tech Hub'), 'Network Hardening', 150000.00, 'Duped');
+
+SELECT * FROM customers;
