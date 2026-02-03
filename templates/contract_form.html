@@ -2,10 +2,10 @@
 
 {% block content %}
 <div class="container" style="max-width: 1000px;">
-    <form method="POST">
+    <form method="POST" id="contractForm">
         
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h3>Create New Contract</h3>
+            <h3>{% if contract %}Edit Contract{% else %}Create New Contract{% endif %}</h3>
             <a href="{{ url_for('list_contracts') }}" class="btn btn-light border">Cancel</a>
         </div>
 
@@ -14,68 +14,83 @@
                 <div class="card shadow-sm mb-3">
                     <div class="card-header bg-light fw-bold">Master Agreement</div>
                     <div class="card-body">
+                        
+                        {% if contract %}
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-danger">Contract Status</label>
+                            <select name="status" class="form-select border-danger fw-bold">
+                                <option value="Draft" {% if contract.status == 'Draft' %}selected{% endif %}>Draft</option>
+                                <option value="Active" {% if contract.status == 'Active' %}selected{% endif %}>Active</option>
+                                <option value="Completed" {% if contract.status == 'Completed' %}selected{% endif %}>Completed</option>
+                                <option value="Terminated" {% if contract.status == 'Terminated' %}selected{% endif %}>Terminated</option>
+                            </select>
+                        </div>
+                        {% endif %}
+
                         <div class="mb-3">
                             <label class="form-label">Customer</label>
                             <select name="customer_id" id="customer_select" class="form-select" onchange="showCustomerDetails()" required>
-    <option value="">-- Select Customer --</option>
-    {% for c in customers %}
-    <option value="{{ c.id }}" 
-            data-gst="{{ c.gst_number }}" 
-            data-gst-status="{{ c.gst_status }}"
-            data-gst-type="{{ c.gst_type }}"
-            data-address="{{ c.address }}" 
-            data-city="{{ c.city }}"
-            data-state="{{ c.state }}"
-            data-country="{{ c.country }}"> {{ c.company_name }}
-    </option>
-    {% endfor %}
-</select>       
-                                    
+                                <option value="">-- Select Customer --</option>
+                                {% for c in customers %}
+                                <option value="{{ c.id }}" 
+                                        {% if contract and contract.customer_id == c.id %}selected{% endif %}
+                                        data-gst="{{ c.gst_number }}" 
+                                        data-gst-status="{{ c.gst_status }}"
+                                        data-gst-type="{{ c.gst_type }}"
+                                        data-address="{{ c.address }}" 
+                                        data-city="{{ c.city }}"
+                                        data-state="{{ c.state }}"
+                                        data-country="{{ c.country }}">
+                                    {{ c.company_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            
+                            <div id="customer_info_card" class="card bg-light border-0 small mt-2 d-none">
+                                <div class="card-body py-2">
+                                    <div class="d-flex justify-content-between border-bottom pb-1 mb-1">
+                                        <span class="text-muted">GST Status:</span>
+                                        <span class="fw-bold text-dark" id="disp_status">N/A</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <span class="text-muted">GST Type:</span>
+                                        <span class="fw-bold text-dark" id="disp_type">N/A</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <span class="text-muted">GST No:</span>
+                                        <span class="fw-bold text-dark" id="disp_gst">N/A</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-1 pt-1 border-top">
+                                        <span class="text-muted">Location:</span>
+                                        <span class="fw-bold text-dark" id="disp_location">N/A</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <span class="text-muted">Country:</span>
+                                        <span class="fw-bold text-dark" id="disp_country">N/A</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div id="customer_info_card" class="card bg-light border-0 small mt-2 d-none">
-    <div class="card-body py-2">
-        <div class="d-flex justify-content-between border-bottom pb-1 mb-1">
-            <span class="text-muted">GST Status:</span>
-            <span class="fw-bold text-dark" id="disp_status">N/A</span>
-        </div>
-        <div class="d-flex justify-content-between">
-            <span class="text-muted">GST Type:</span>
-            <span class="fw-bold text-dark" id="disp_type">N/A</span>
-        </div>
-        <div class="d-flex justify-content-between">
-            <span class="text-muted">GST No:</span>
-            <span class="fw-bold text-dark" id="disp_gst">N/A</span>
-        </div>
-        <div class="d-flex justify-content-between mt-1 pt-1 border-top">
-            <span class="text-muted">Location:</span>
-            <span class="fw-bold text-dark" id="disp_location">N/A</span>
-        </div>
-        <div class="d-flex justify-content-between">
-            <span class="text-muted">Country:</span>
-            <span class="fw-bold text-dark" id="disp_country">N/A</span>
-        </div>
-    </div>
-</div>
 
                         <div class="mb-3">
                             <label class="form-label">Contract Title</label>
-                            <input type="text" name="contract_name" class="form-control" placeholder="e.g. Annual Maintenance 2026" required>
+                            <input type="text" name="contract_name" class="form-control" value="{{ contract.contract_name if contract else '' }}" placeholder="e.g. Annual Maintenance 2026" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Total Contract Value</label>
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
-                                <input type="number" id="total_value" name="total_value" class="form-control fw-bold" step="0.01" oninput="updateBalance()" required>
+                                <input type="number" id="total_value" name="total_value" class="form-control fw-bold" step="0.01" value="{{ contract.total_value if contract else '' }}" oninput="updateBalance()" required>
                             </div>
                         </div>
                         <div class="row g-2 mb-3">
                             <div class="col-6">
                                 <label class="form-label small">Start Date</label>
-                                <input type="date" name="start_date" class="form-control" required>
+                                <input type="date" name="start_date" class="form-control" value="{{ contract.start_date if contract else '' }}" required>
                             </div>
                             <div class="col-6">
                                 <label class="form-label small">End Date</label>
-                                <input type="date" name="end_date" class="form-control" required>
+                                <input type="date" name="end_date" class="form-control" value="{{ contract.end_date if contract else '' }}" required>
                             </div>
                         </div>
                     </div>
@@ -120,7 +135,7 @@
         </div>
 
         <div class="mt-4 text-end pb-5">
-            <button type="submit" class="btn btn-success px-5 py-2 fw-bold shadow-sm">Save Contract</button>
+            <button type="button" onclick="validateAndSave()" class="btn btn-success px-5 py-2 fw-bold shadow-sm">Save Contract</button>
         </div>
     </form>
 </div>
@@ -129,10 +144,52 @@
     let slabCount = 0;
     const MAX_SLABS = 12;
 
-    // Load 1 initial slab
-    window.onload = function() { addSlab(); };
+    window.onload = function() {
+        showCustomerDetails(); 
+        
+        // Load Slabs
+        {% if slabs %}
+            {% for slab in slabs %}
+                addSlab("{{ slab.slab_name }}", "{{ slab.due_date }}", "{{ slab.amount }}", "{{ slab.status }}");
+            {% endfor %}
+        {% else %}
+            addSlab(); 
+        {% endif %}
+        
+        updateBalance();
+    };
 
-    function addSlab() {
+    function validateAndSave() {
+        const total = parseFloat(document.getElementById('total_value').value) || 0;
+        const inputs = document.querySelectorAll('.slab-amount');
+        let allocated = 0;
+        
+        // 1. Calculate Sum
+        inputs.forEach(input => {
+            allocated += parseFloat(input.value) || 0;
+        });
+
+        const difference = Math.abs(total - allocated);
+
+        // 2. Validate Math (Must be within 0.01)
+        if (difference > 0.01) {
+            alert(`Error: Totals do not match.\n\nTarget: ${total}\nAllocated: ${allocated}\nDifference: ${difference.toFixed(2)}`);
+            return; // Stop here
+        }
+
+        // 3. Validate Required Fields (Basic check)
+        const customer = document.getElementById('customer_select').value;
+        const title = document.querySelector('input[name="contract_name"]').value;
+        if(!customer || !title || total <= 0) {
+            alert("Please fill in all required fields (Customer, Title, Total Value).");
+            return;
+        }
+
+        // 4. If all good, Submit the Form manually!
+        document.getElementById('contractForm').submit();
+    }
+
+    function addSlab(name = '', date = '', amount = '', status = 'Pending') {
         if (slabCount >= MAX_SLABS) return;
 
         slabCount++;
@@ -142,9 +199,12 @@
         
         row.innerHTML = `
             <td class="align-middle text-center text-muted fw-bold ps-3">${slabCount}</td>
-            <td><input type="text" name="slab_name[]" class="form-control form-control-sm border-0 bg-transparent" placeholder="e.g. Phase ${slabCount} Payment" required></td>
-            <td><input type="date" name="slab_date[]" class="form-control form-control-sm" required></td>
-            <td><input type="number" name="slab_amount[]" class="form-control form-control-sm slab-amount" step="0.01" oninput="updateBalance()" required></td>
+            <td>
+                <input type="text" name="slab_name[]" class="form-control form-control-sm border-0 bg-transparent" value="${name}" placeholder="e.g. Phase ${slabCount}" required>
+                <input type="hidden" name="slab_status[]" value="${status}">
+            </td>
+            <td><input type="date" name="slab_date[]" class="form-control form-control-sm" value="${date}" required></td>
+            <td><input type="number" name="slab_amount[]" class="form-control form-control-sm slab-amount" value="${amount}" step="0.01" oninput="updateBalance()" required></td>
             <td class="align-middle text-center">
                 ${slabCount > 1 ? `<button type="button" class="btn btn-link text-danger p-0" onclick="removeSlab(${slabCount})"><i class="fa-solid fa-xmark"></i></button>` : ''}
             </td>
@@ -157,7 +217,7 @@
     function removeSlab(id) {
         const row = document.getElementById(`row-${id}`);
         row.remove();
-        slabCount--; // Note: ID numbers won't visually reset, but count decreases
+        slabCount--; 
         checkLimit();
         updateBalance();
     }
@@ -190,59 +250,45 @@
         
         display.innerText = remaining.toFixed(2);
         
-        if (remaining < 0) {
-            alertBox.classList.remove('alert-primary', 'alert-success');
-            alertBox.classList.add('alert-danger');
-            display.innerText = "Over Limit: " + remaining.toFixed(2);
-        } else if (remaining === 0 && total > 0) {
+        if (Math.abs(remaining) < 0.01) {
             alertBox.classList.remove('alert-primary', 'alert-danger');
             alertBox.classList.add('alert-success');
             display.innerText = "Balanced (0.00)";
         } else {
-            alertBox.classList.remove('alert-danger', 'alert-success');
-            alertBox.classList.add('alert-primary');
+            alertBox.classList.remove('alert-primary', 'alert-success');
+            alertBox.classList.add('alert-danger');
+            if (remaining < 0) display.innerText = "Over Limit: " + remaining.toFixed(2);
         }
     }
+
     function showCustomerDetails() {
-    const select = document.getElementById('customer_select');
-    const card = document.getElementById('customer_info_card');
-    
-    const selectedOption = select.options[select.selectedIndex];
-    
-    if (select.value) {
-        // 1. Grab raw data
-        const rawStatus = selectedOption.getAttribute('data-gst-status') || 'N/A';
-        const type = selectedOption.getAttribute('data-gst-type') || 'N/A';
-        const gst = selectedOption.getAttribute('data-gst') || 'N/A';
-        const city = selectedOption.getAttribute('data-city') || '';
-        const state = selectedOption.getAttribute('data-state') || '';
-        const country = selectedOption.getAttribute('data-country') || '';
-
-        // 2. Format GST Status text
-        let displayStatus = rawStatus;
-        if (rawStatus === 'Registered') {
-            displayStatus = 'Yes (Registered)';
-        } else if (rawStatus === 'No_Forex') {
-            displayStatus = 'No (Forex)';
-        } else if (rawStatus === 'No_SEZ') {
-            displayStatus = 'No (SEZ)';
-        }
-
-        // 3. Update DOM
-        document.getElementById('disp_status').innerText = displayStatus;
-        document.getElementById('disp_type').innerText = type;
-        document.getElementById('disp_gst').innerText = gst;
-        document.getElementById('disp_location').innerText = `${city}, ${state}`;
-        document.getElementById('disp_country').innerText = country;
+        const select = document.getElementById('customer_select');
+        const card = document.getElementById('customer_info_card');
+        const selectedOption = select.options[select.selectedIndex];
         
-        // 4. Show card
-        card.classList.remove('d-none');
-    } else {
-        card.classList.add('d-none');
+        if (select.value) {
+            const rawStatus = selectedOption.getAttribute('data-gst-status') || 'N/A';
+            const type = selectedOption.getAttribute('data-gst-type') || 'N/A';
+            const gst = selectedOption.getAttribute('data-gst') || 'N/A';
+            const city = selectedOption.getAttribute('data-city') || '';
+            const state = selectedOption.getAttribute('data-state') || '';
+            const country = selectedOption.getAttribute('data-country') || '';
+
+            let displayStatus = rawStatus;
+            if (rawStatus === 'Registered') displayStatus = 'Yes (Registered)';
+            else if (rawStatus === 'No_Forex') displayStatus = 'No (Forex)';
+            else if (rawStatus === 'No_SEZ') displayStatus = 'No (SEZ)';
+
+            document.getElementById('disp_status').innerText = displayStatus;
+            document.getElementById('disp_type').innerText = type;
+            document.getElementById('disp_gst').innerText = gst;
+            document.getElementById('disp_location').innerText = `${city}, ${state}`;
+            document.getElementById('disp_country').innerText = country;
+            
+            card.classList.remove('d-none');
+        } else {
+            card.classList.add('d-none');
+        }
     }
-}
-
-
-
 </script>
 {% endblock %}

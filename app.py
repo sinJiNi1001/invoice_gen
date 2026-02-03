@@ -215,7 +215,7 @@ def list_contracts():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     
-    # 1. Fetch All Contracts
+    # 1. Fetch All Contracts with Customer Names
     cursor.execute("""
         SELECT contracts.*, customers.company_name, customers.currency 
         FROM contracts 
@@ -224,17 +224,16 @@ def list_contracts():
     """)
     contracts = fetch_as_dict(cursor)
     
-    # 2. Fetch All Slabs (to show inside the accordion)
+    # 2. Fetch All Slabs
     cursor.execute("SELECT * FROM contract_slabs ORDER BY due_date ASC")
     all_slabs = fetch_as_dict(cursor)
     
     conn.close()
 
-    # 3. Python Logic: Group Slabs by Contract ID
-    # This avoids doing a database query inside a loop (which is slow)
+    # 3. Group Slabs by Contract ID
     contracts_map = {c['id']: c for c in contracts}
     for c in contracts:
-        c['slabs'] = [] # Initialize empty list
+        c['slabs'] = []
         
     for slab in all_slabs:
         if slab['contract_id'] in contracts_map:
@@ -248,7 +247,7 @@ def create_contract():
     cursor = conn.cursor(dictionary=True)
 
     if request.method == 'POST':
-        # A. Save Main Contract
+        # Insert Main Contract
         cursor.execute("""
             INSERT INTO contracts (
                 customer_id, contract_name, total_value, start_date, end_date, status
@@ -263,13 +262,12 @@ def create_contract():
         ))
         contract_id = cursor.lastrowid
         
-        # B. Save Slabs (Loop through the lists)
+        # Insert Slabs
         slab_names = request.form.getlist('slab_name[]')
         slab_amounts = request.form.getlist('slab_amount[]')
         slab_dates = request.form.getlist('slab_date[]')
         
         for i in range(len(slab_names)):
-            # Only save if the row has a name
             if slab_names[i].strip():
                 cursor.execute("""
                     INSERT INTO contract_slabs (
@@ -286,14 +284,85 @@ def create_contract():
         conn.close()
         return redirect(url_for('list_contracts'))
 
-    # GET Request: Fetch ALL customer details so we can show GST/Address in the form
+    # GET: Fetch Customers
     cursor.execute("SELECT * FROM customers ORDER BY company_name ASC")
     customers = fetch_as_dict(cursor)
     conn.close()
     
-    return render_template('contract_form.html', customers=customers)
-   
+    return render_template('contract_form.html', customers=customers, contract=None, slabs=None)
 
+@app.route('/contracts/edit/<int:id>', methods=('GET', 'POST'))
+def edit_contract(id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    if request.method == 'POST':
+        # 1. Update Main Contract
+        cursor.execute("""
+            UPDATE contracts 
+            SET customer_id = %s, contract_name = %s, total_value = %s, start_date = %s, end_date = %s, status = %s
+            WHERE id = %s
+        """, (
+            request.form['customer_id'],
+            request.form['contract_name'],
+            request.form['total_value'],
+            request.form['start_date'],
+            request.form['end_date'],
+            request.form['status'],
+            id
+        ))
+
+        # 2. Update Slabs (Delete old, Insert new, preserving Status)
+        cursor.execute("DELETE FROM contract_slabs WHERE contract_id = %s", (id,))
+        
+        slab_names = request.form.getlist('slab_name[]')
+        slab_amounts = request.form.getlist('slab_amount[]')
+        slab_dates = request.form.getlist('slab_date[]')
+        slab_statuses = request.form.getlist('slab_status[]') # <--- Grab Status
+        
+        for i in range(len(slab_names)):
+            if slab_names[i].strip():
+                # Ensure we don't crash if lists are misaligned
+                current_status = slab_statuses[i] if i < len(slab_statuses) else 'Pending'
+                
+                cursor.execute("""
+                    INSERT INTO contract_slabs (
+                        contract_id, slab_name, amount, due_date, status
+                    ) VALUES (%s, %s, %s, %s, %s)
+                """, (
+                    id,
+                    slab_names[i],
+                    slab_amounts[i],
+                    slab_dates[i],
+                    current_status
+                ))
+
+        conn.commit()
+        conn.close()
+        return redirect(url_for('list_contracts'))
+
+    # GET: Fetch Data
+    cursor.execute("SELECT * FROM contracts WHERE id = %s", (id,))
+    contract = cursor.fetchone()
+    
+    cursor.execute("SELECT * FROM contract_slabs WHERE contract_id = %s ORDER BY due_date ASC", (id,))
+    slabs = fetch_as_dict(cursor)
+    
+    cursor.execute("SELECT * FROM customers ORDER BY company_name ASC")
+    customers = fetch_as_dict(cursor)
+    
+    conn.close()
+    return render_template('contract_form.html', contract=contract, slabs=slabs, customers=customers)
+
+# --- NEW: Route to change payment status via Dashboard ---
+@app.route('/contracts/slab/<int:slab_id>/status/<string:new_status>')
+def update_slab_status(slab_id, new_status):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE contract_slabs SET status = %s WHERE id = %s", (new_status, slab_id))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('list_contracts'))
 
 if __name__ == '__main__':
     app.run(debug=True, port=8000)
