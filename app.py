@@ -216,11 +216,12 @@ def list_contracts():
     cursor = conn.cursor(dictionary=True)
     
     # 1. Fetch All Contracts with Customer Names
+    # Ensure 'created_at' is selected
     cursor.execute("""
         SELECT contracts.*, customers.company_name, customers.currency 
         FROM contracts 
         JOIN customers ON contracts.customer_id = customers.id
-        ORDER BY contracts.created_at DESC
+        ORDER BY contracts.created_at DESC -- Default sort
     """)
     contracts = fetch_as_dict(cursor)
     
@@ -248,13 +249,15 @@ def create_contract():
 
     if request.method == 'POST':
         # Insert Main Contract
+        # In create_contract > POST block
         cursor.execute("""
             INSERT INTO contracts (
-                customer_id, contract_name, total_value, start_date, end_date, status
-            ) VALUES (%s, %s, %s, %s, %s, %s)
+                customer_id, contract_name, po_reference, total_value, start_date, end_date, status
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
         """, (
             request.form['customer_id'],
             request.form['contract_name'],
+            request.form['po_reference'], # <--- NEW
             request.form['total_value'],
             request.form['start_date'],
             request.form['end_date'],
@@ -298,13 +301,15 @@ def edit_contract(id):
 
     if request.method == 'POST':
         # 1. Update Main Contract
+        # In edit_contract > POST block
         cursor.execute("""
             UPDATE contracts 
-            SET customer_id = %s, contract_name = %s, total_value = %s, start_date = %s, end_date = %s, status = %s
+            SET customer_id = %s, contract_name = %s, po_reference = %s, total_value = %s, start_date = %s, end_date = %s, status = %s
             WHERE id = %s
         """, (
             request.form['customer_id'],
             request.form['contract_name'],
+            request.form['po_reference'], # <--- NEW
             request.form['total_value'],
             request.form['start_date'],
             request.form['end_date'],

@@ -19,7 +19,7 @@
                         <div class="mb-3">
                             <label class="form-label fw-bold text-danger">Contract Status</label>
                             <select name="status" class="form-select border-danger fw-bold">
-                                <option value="Draft" {% if contract.status == 'Draft' %}selected{% endif %}>Draft</option>
+                                <option value="not started" {% if contract.status == 'not started' %}selected{% endif %}>not started</option>
                                 <option value="Active" {% if contract.status == 'Active' %}selected{% endif %}>Active</option>
                                 <option value="Completed" {% if contract.status == 'Completed' %}selected{% endif %}>Completed</option>
                                 <option value="Terminated" {% if contract.status == 'Terminated' %}selected{% endif %}>Terminated</option>
@@ -30,21 +30,21 @@
                         <div class="mb-3">
                             <label class="form-label">Customer</label>
                             <select name="customer_id" id="customer_select" class="form-select" onchange="showCustomerDetails()" required>
-                                <option value="">-- Select Customer --</option>
-                                {% for c in customers %}
-                                <option value="{{ c.id }}" 
-                                        {% if contract and contract.customer_id == c.id %}selected{% endif %}
-                                        data-gst="{{ c.gst_number }}" 
-                                        data-gst-status="{{ c.gst_status }}"
-                                        data-gst-type="{{ c.gst_type }}"
-                                        data-address="{{ c.address }}" 
-                                        data-city="{{ c.city }}"
-                                        data-state="{{ c.state }}"
-                                        data-country="{{ c.country }}">
-                                    {{ c.company_name }}
-                                </option>
-                                {% endfor %}
-                            </select>
+    <option value="">-- Select Customer --</option>
+    {% for c in customers %}
+    <option value="{{ c.id }}" 
+            {% if contract and contract.customer_id == c.id %}selected{% endif %}
+            data-gst="{{ c.gst_number }}" 
+            data-gst-status="{{ c.gst_status }}"
+            data-gst-type="{{ c.gst_type }}"
+            data-address="{{ c.address }}" 
+            data-city="{{ c.city }}"
+            data-state="{{ c.state }}"
+            data-country="{{ c.country }}"
+            data-currency="{{ c.currency }}"> {{ c.company_name }}
+    </option>
+    {% endfor %}
+</select>
                             
                             <div id="customer_info_card" class="card bg-light border-0 small mt-2 d-none">
                                 <div class="card-body py-2">
@@ -76,13 +76,19 @@
                             <label class="form-label">Contract Title</label>
                             <input type="text" name="contract_name" class="form-control" value="{{ contract.contract_name if contract else '' }}" placeholder="e.g. Annual Maintenance 2026" required>
                         </div>
+<div class="mb-3">
+    <label class="form-label text-muted small">PO / Agreement Ref (Optional)</label>
+    <input type="text" name="po_reference" class="form-control" 
+           value="{{ contract.po_reference if contract and contract.po_reference else '' }}" 
+           placeholder="e.g. PO-2026-998 or Ref: MSA-V2">
+</div>
                         <div class="mb-3">
-                            <label class="form-label">Total Contract Value</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" id="total_value" name="total_value" class="form-control fw-bold" step="0.01" value="{{ contract.total_value if contract else '' }}" oninput="updateBalance()" required>
-                            </div>
-                        </div>
+    <label class="form-label">Total Contract Value</label>
+    <div class="input-group">
+        <span class="input-group-text fw-bold" id="currency_symbol">$</span>
+        <input type="number" id="total_value" name="total_value" class="form-control fw-bold" step="0.01" value="{{ contract.total_value if contract else '' }}" oninput="updateBalance()" required>
+    </div>
+</div>
                         <div class="row g-2 mb-3">
                             <div class="col-6">
                                 <label class="form-label small">Start Date</label>
@@ -260,35 +266,47 @@
             if (remaining < 0) display.innerText = "Over Limit: " + remaining.toFixed(2);
         }
     }
-
     function showCustomerDetails() {
-        const select = document.getElementById('customer_select');
-        const card = document.getElementById('customer_info_card');
-        const selectedOption = select.options[select.selectedIndex];
+    const select = document.getElementById('customer_select');
+    const card = document.getElementById('customer_info_card');
+    const currencySpan = document.getElementById('currency_symbol'); // <--- Select the span
+
+    const selectedOption = select.options[select.selectedIndex];
+    
+    if (select.value) {
+        // 1. Existing Data Fetching
+        const rawStatus = selectedOption.getAttribute('data-gst-status') || 'N/A';
+        const type = selectedOption.getAttribute('data-gst-type') || 'N/A';
+        const gst = selectedOption.getAttribute('data-gst') || 'N/A';
+        const city = selectedOption.getAttribute('data-city') || '';
+        const state = selectedOption.getAttribute('data-state') || '';
+        const country = selectedOption.getAttribute('data-country') || '';
         
-        if (select.value) {
-            const rawStatus = selectedOption.getAttribute('data-gst-status') || 'N/A';
-            const type = selectedOption.getAttribute('data-gst-type') || 'N/A';
-            const gst = selectedOption.getAttribute('data-gst') || 'N/A';
-            const city = selectedOption.getAttribute('data-city') || '';
-            const state = selectedOption.getAttribute('data-state') || '';
-            const country = selectedOption.getAttribute('data-country') || '';
+        // 2. NEW: Get Currency (Default to '$' if missing)
+        const currency = selectedOption.getAttribute('data-currency') || '$';
+        
+        // 3. Update the Currency Symbol in the UI
+        currencySpan.innerText = currency;
 
-            let displayStatus = rawStatus;
-            if (rawStatus === 'Registered') displayStatus = 'Yes (Registered)';
-            else if (rawStatus === 'No_Forex') displayStatus = 'No (Forex)';
-            else if (rawStatus === 'No_SEZ') displayStatus = 'No (SEZ)';
+        // ... (Rest of your existing status logic) ...
+        let displayStatus = rawStatus;
+        if (rawStatus === 'Registered') displayStatus = 'Yes (Registered)';
+        else if (rawStatus === 'No_Forex') displayStatus = 'No (Forex)';
+        else if (rawStatus === 'No_SEZ') displayStatus = 'No (SEZ)';
 
-            document.getElementById('disp_status').innerText = displayStatus;
-            document.getElementById('disp_type').innerText = type;
-            document.getElementById('disp_gst').innerText = gst;
-            document.getElementById('disp_location').innerText = `${city}, ${state}`;
-            document.getElementById('disp_country').innerText = country;
-            
-            card.classList.remove('d-none');
-        } else {
-            card.classList.add('d-none');
-        }
+        document.getElementById('disp_status').innerText = displayStatus;
+        document.getElementById('disp_type').innerText = type;
+        document.getElementById('disp_gst').innerText = gst;
+        document.getElementById('disp_location').innerText = `${city}, ${state}`;
+        document.getElementById('disp_country').innerText = country;
+        
+        card.classList.remove('d-none');
+    } else {
+        card.classList.add('d-none');
+        currencySpan.innerText = '$'; // Reset to default
     }
+}
+
+    
 </script>
 {% endblock %}
