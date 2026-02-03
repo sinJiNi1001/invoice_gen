@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container" style="max-width: 1000px;">
+    <form method="POST">
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3>Create New Contract</h3>
+            <a href="{{ url_for('list_contracts') }}" class="btn btn-light border">Cancel</a>
+        </div>
+
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-light fw-bold">Master Agreement</div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Customer</label>
+                            <select name="customer_id" id="customer_select" class="form-select" onchange="showCustomerDetails()" required>
+    <option value="">-- Select Customer --</option>
+    {% for c in customers %}
+    <option value="{{ c.id }}" 
+            data-gst="{{ c.gst_number }}" 
+            data-gst-status="{{ c.gst_status }}"
+            data-gst-type="{{ c.gst_type }}"
+            data-address="{{ c.address }}" 
+            data-city="{{ c.city }}"
+            data-state="{{ c.state }}"
+            data-country="{{ c.country }}"> {{ c.company_name }}
+    </option>
+    {% endfor %}
+</select>       
+                                    
+                        </div>
+                        <div id="customer_info_card" class="card bg-light border-0 small mt-2 d-none">
+    <div class="card-body py-2">
+        <div class="d-flex justify-content-between border-bottom pb-1 mb-1">
+            <span class="text-muted">GST Status:</span>
+            <span class="fw-bold text-dark" id="disp_status">N/A</span>
+        </div>
+        <div class="d-flex justify-content-between">
+            <span class="text-muted">GST Type:</span>
+            <span class="fw-bold text-dark" id="disp_type">N/A</span>
+        </div>
+        <div class="d-flex justify-content-between">
+            <span class="text-muted">GST No:</span>
+            <span class="fw-bold text-dark" id="disp_gst">N/A</span>
+        </div>
+        <div class="d-flex justify-content-between mt-1 pt-1 border-top">
+            <span class="text-muted">Location:</span>
+            <span class="fw-bold text-dark" id="disp_location">N/A</span>
+        </div>
+        <div class="d-flex justify-content-between">
+            <span class="text-muted">Country:</span>
+            <span class="fw-bold text-dark" id="disp_country">N/A</span>
+        </div>
+    </div>
+</div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Contract Title</label>
+                            <input type="text" name="contract_name" class="form-control" placeholder="e.g. Annual Maintenance 2026" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Total Contract Value</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" id="total_value" name="total_value" class="form-control fw-bold" step="0.01" oninput="updateBalance()" required>
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small">Start Date</label>
+                                <input type="date" name="start_date" class="form-control" required>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">End Date</label>
+                                <input type="date" name="end_date" class="form-control" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-primary shadow-sm text-center">
+                    <small class="text-uppercase fw-bold opacity-75">Unallocated Balance</small>
+                    <h3 id="balance_display" class="mb-0 fw-bold mt-1">0.00</h3>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="card shadow-sm" style="min-height: 500px;">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                        <span class="fw-bold">Payment Schedule (Slabs)</span>
+                        <button type="button" class="btn btn-sm btn-primary" id="addSlabBtn" onclick="addSlab()">
+                            <i class="fa-solid fa-plus"></i> Add Milestone
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-striped mb-0">
+                                <thead class="table-light small text-muted text-uppercase">
+                                    <tr>
+                                        <th class="ps-3" width="5%">#</th>
+                                        <th width="40%">Milestone Name</th>
+                                        <th width="25%">Due Date</th>
+                                        <th width="25%">Amount</th>
+                                        <th width="5%"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="slabContainer">
+                                    </tbody>
+                            </table>
+                        </div>
+                        <div id="limitMsg" class="text-center text-danger small py-2 d-none fw-bold">
+                            <i class="fa-solid fa-triangle-exclamation me-1"></i> Maximum 12 slabs reached.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4 text-end pb-5">
+            <button type="submit" class="btn btn-success px-5 py-2 fw-bold shadow-sm">Save Contract</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    let slabCount = 0;
+    const MAX_SLABS = 12;
+
+    // Load 1 initial slab
+    window.onload = function() { addSlab(); };
+
+    function addSlab() {
+        if (slabCount >= MAX_SLABS) return;
+
+        slabCount++;
+        const container = document.getElementById('slabContainer');
+        const row = document.createElement('tr');
+        row.id = `row-${slabCount}`;
+        
+        row.innerHTML = `
+            <td class="align-middle text-center text-muted fw-bold ps-3">${slabCount}</td>
+            <td><input type="text" name="slab_name[]" class="form-control form-control-sm border-0 bg-transparent" placeholder="e.g. Phase ${slabCount} Payment" required></td>
+            <td><input type="date" name="slab_date[]" class="form-control form-control-sm" required></td>
+            <td><input type="number" name="slab_amount[]" class="form-control form-control-sm slab-amount" step="0.01" oninput="updateBalance()" required></td>
+            <td class="align-middle text-center">
+                ${slabCount > 1 ? `<button type="button" class="btn btn-link text-danger p-0" onclick="removeSlab(${slabCount})"><i class="fa-solid fa-xmark"></i></button>` : ''}
+            </td>
+        `;
+        
+        container.appendChild(row);
+        checkLimit();
+    }
+
+    function removeSlab(id) {
+        const row = document.getElementById(`row-${id}`);
+        row.remove();
+        slabCount--; // Note: ID numbers won't visually reset, but count decreases
+        checkLimit();
+        updateBalance();
+    }
+
+    function checkLimit() {
+        const btn = document.getElementById('addSlabBtn');
+        const msg = document.getElementById('limitMsg');
+        
+        if (slabCount >= MAX_SLABS) {
+            btn.disabled = true;
+            msg.classList.remove('d-none');
+        } else {
+            btn.disabled = false;
+            msg.classList.add('d-none');
+        }
+    }
+
+    function updateBalance() {
+        const total = parseFloat(document.getElementById('total_value').value) || 0;
+        const inputs = document.querySelectorAll('.slab-amount');
+        let allocated = 0;
+        
+        inputs.forEach(input => {
+            allocated += parseFloat(input.value) || 0;
+        });
+
+        const remaining = total - allocated;
+        const display = document.getElementById('balance_display');
+        const alertBox = display.parentElement;
+        
+        display.innerText = remaining.toFixed(2);
+        
+        if (remaining < 0) {
+            alertBox.classList.remove('alert-primary', 'alert-success');
+            alertBox.classList.add('alert-danger');
+            display.innerText = "Over Limit: " + remaining.toFixed(2);
+        } else if (remaining === 0 && total > 0) {
+            alertBox.classList.remove('alert-primary', 'alert-danger');
+            alertBox.classList.add('alert-success');
+            display.innerText = "Balanced (0.00)";
+        } else {
+            alertBox.classList.remove('alert-danger', 'alert-success');
+            alertBox.classList.add('alert-primary');
+        }
+    }
+    function showCustomerDetails() {
+    const select = document.getElementById('customer_select');
+    const card = document.getElementById('customer_info_card');
+    
+    const selectedOption = select.options[select.selectedIndex];
+    
+    if (select.value) {
+        // 1. Grab raw data
+        const rawStatus = selectedOption.getAttribute('data-gst-status') || 'N/A';
+        const type = selectedOption.getAttribute('data-gst-type') || 'N/A';
+        const gst = selectedOption.getAttribute('data-gst') || 'N/A';
+        const city = selectedOption.getAttribute('data-city') || '';
+        const state = selectedOption.getAttribute('data-state') || '';
+        const country = selectedOption.getAttribute('data-country') || '';
+
+        // 2. Format GST Status text
+        let displayStatus = rawStatus;
+        if (rawStatus === 'Registered') {
+            displayStatus = 'Yes (Registered)';
+        } else if (rawStatus === 'No_Forex') {
+            displayStatus = 'No (Forex)';
+        } else if (rawStatus === 'No_SEZ') {
+            displayStatus = 'No (SEZ)';
+        }
+
+        // 3. Update DOM
+        document.getElementById('disp_status').innerText = displayStatus;
+        document.getElementById('disp_type').innerText = type;
+        document.getElementById('disp_gst').innerText = gst;
+        document.getElementById('disp_location').innerText = `${city}, ${state}`;
+        document.getElementById('disp_country').innerText = country;
+        
+        // 4. Show card
+        card.classList.remove('d-none');
+    } else {
+        card.classList.add('d-none');
+    }
+}
+
+
+
+</script>
+{% endblock %}

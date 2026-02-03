@@ -206,5 +206,94 @@ def create_invoice(): return "<h1>Create Invoice</h1><p>Coming next...</p>"
 @app.route('/invoices/edit')
 def edit_list(): return "<h1>Edit Invoice</h1><p>Coming next...</p>"
 
+# ==========================================
+# CONTRACT ROUTES
+# ==========================================
+
+@app.route('/contracts')
+def list_contracts():
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    # 1. Fetch All Contracts
+    cursor.execute("""
+        SELECT contracts.*, customers.company_name, customers.currency 
+        FROM contracts 
+        JOIN customers ON contracts.customer_id = customers.id
+        ORDER BY contracts.created_at DESC
+    """)
+    contracts = fetch_as_dict(cursor)
+    
+    # 2. Fetch All Slabs (to show inside the accordion)
+    cursor.execute("SELECT * FROM contract_slabs ORDER BY due_date ASC")
+    all_slabs = fetch_as_dict(cursor)
+    
+    conn.close()
+
+    # 3. Python Logic: Group Slabs by Contract ID
+    # This avoids doing a database query inside a loop (which is slow)
+    contracts_map = {c['id']: c for c in contracts}
+    for c in contracts:
+        c['slabs'] = [] # Initialize empty list
+        
+    for slab in all_slabs:
+        if slab['contract_id'] in contracts_map:
+            contracts_map[slab['contract_id']]['slabs'].append(slab)
+
+    return render_template('contract_list.html', contracts=contracts)
+
+@app.route('/contracts/new', methods=('GET', 'POST'))
+def create_contract():
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    if request.method == 'POST':
+        # A. Save Main Contract
+        cursor.execute("""
+            INSERT INTO contracts (
+                customer_id, contract_name, total_value, start_date, end_date, status
+            ) VALUES (%s, %s, %s, %s, %s, %s)
+        """, (
+            request.form['customer_id'],
+            request.form['contract_name'],
+            request.form['total_value'],
+            request.form['start_date'],
+            request.form['end_date'],
+            'Active'
+        ))
+        contract_id = cursor.lastrowid
+        
+        # B. Save Slabs (Loop through the lists)
+        slab_names = request.form.getlist('slab_name[]')
+        slab_amounts = request.form.getlist('slab_amount[]')
+        slab_dates = request.form.getlist('slab_date[]')
+        
+        for i in range(len(slab_names)):
+            # Only save if the row has a name
+            if slab_names[i].strip():
+                cursor.execute("""
+                    INSERT INTO contract_slabs (
+                        contract_id, slab_name, amount, due_date, status
+                    ) VALUES (%s, %s, %s, %s, 'Pending')
+                """, (
+                    contract_id,
+                    slab_names[i],
+                    slab_amounts[i],
+                    slab_dates[i]
+                ))
+
+        conn.commit()
+        conn.close()
+        return redirect(url_for('list_contracts'))
+
+    # GET Request: Fetch ALL customer details so we can show GST/Address in the form
+    cursor.execute("SELECT * FROM customers ORDER BY company_name ASC")
+    customers = fetch_as_dict(cursor)
+    conn.close()
+    
+    return render_template('contract_form.html', customers=customers)
+   
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=8000)

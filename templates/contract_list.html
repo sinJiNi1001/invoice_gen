@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Contracts</h2>
+        <a href="{{ url_for('create_contract') }}" class="btn btn-primary shadow-sm">
+            <i class="fa-solid fa-file-contract me-2"></i>New Contract
+        </a>
+    </div>
+
+    <div class="accordion" id="contractAccordion">
+        {% for c in contracts %}
+        <div class="accordion-item shadow-sm mb-3 border-0 rounded overflow-hidden">
+            
+            <h2 class="accordion-header" id="heading{{ c.id }}">
+                <button class="accordion-button collapsed bg-white" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ c.id }}">
+                    <div class="d-flex align-items-center w-100 pe-3">
+                        
+                        <div class="rounded bg-light text-primary d-flex justify-content-center align-items-center me-3" 
+                             style="width: 50px; height: 50px;">
+                            <i class="fa-solid fa-file-signature fa-lg"></i>
+                        </div>
+                        
+                        <div class="me-auto">
+                            <div class="fw-bold text-dark">{{ c.contract_name }}</div>
+                            <div class="small text-muted">{{ c.company_name }}</div>
+                        </div>
+
+                        <div class="me-4">
+                            {% if c.status == 'Active' %}<span class="badge bg-success bg-opacity-10 text-success">Active</span>
+                            {% elif c.status == 'Draft' %}<span class="badge bg-secondary bg-opacity-10 text-secondary">Draft</span>
+                            {% else %}<span class="badge bg-dark">Closed</span>{% endif %}
+                        </div>
+
+                        <div class="text-end">
+                            <div class="fw-bold text-dark">{{ "{:,.2f}".format(c.total_value) }} {{ c.currency }}</div>
+                            <div class="small text-muted">{{ c.slabs|length }} Slabs</div>
+                        </div>
+                    </div>
+                </button>
+            </h2>
+
+            <div id="collapse{{ c.id }}" class="accordion-collapse collapse" data-bs-parent="#contractAccordion">
+                <div class="accordion-body bg-light p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light text-muted small text-uppercase">
+                                <tr>
+                                    <th class="ps-4">Milestone</th>
+                                    <th>Due Date</th>
+                                    <th>Status</th>
+                                    <th class="text-end pe-4">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for slab in c.slabs %}
+                                <tr>
+                                    <td class="ps-4 border-start border-4 border-primary">{{ slab.slab_name }}</td>
+                                    <td>{{ slab.due_date }}</td>
+                                    <td>
+                                        {% if slab.status == 'Paid' %}
+                                            <i class="fa-solid fa-circle-check text-success me-1"></i> Paid
+                                        {% elif slab.status == 'Invoiced' %}
+                                            <i class="fa-solid fa-file-invoice text-primary me-1"></i> Invoiced
+                                        {% else %}
+                                            <i class="fa-regular fa-clock text-muted me-1"></i> Pending
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end pe-4">{{ "{:,.2f}".format(slab.amount) }}</td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="4" class="text-center text-muted py-3">No payment slabs defined.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="p-2 border-top bg-white text-end">
+                        <button class="btn btn-sm btn-outline-secondary">Edit Contract</button>
+                        </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="fa-solid fa-file-contract fa-3x mb-3 opacity-25"></i>
+            <h4>No Contracts Found</h4>
+            <p>Create a contract to start tracking billing milestones.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
