@@ -4,10 +4,22 @@ from typing import List, Dict, Any
 import os
 from datetime import date
 from dotenv import load_dotenv
+from flask_sqlalchemy import SQLAlchemy
+from database import db, Customer, Invoice # Removed Project
+
 
 load_dotenv()
 
 app = Flask(__name__)
+
+app.secret_key = "valency_secret" 
+
+# SQLALCHEMY CONFIG (For the Invoice Tool)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:Sinu%40123@localhost/invoice_generator'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db.init_app(app)
+
 
 # --- DATABASE CONFIG ---
 db_config = {
