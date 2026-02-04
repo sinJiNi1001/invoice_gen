@@ -1,0 +1,433 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card shadow-sm border-0 mb-5 no-print">
+        <div class="card-header bg-info text-black d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Create New Invoice</h5>
+            <small>Valency Networks - Billing Module</small>
+        </div>
+        <div class="card-body">
+            <form action="{{ url_for('create_invoice') }}" method="POST" id="invoiceForm">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="fw-bold small">INVOICE NUMBER</label>
+                        <div class="input-group">
+                            <input type="text" name="invoice_number" id="invoice_number" class="form-control fw-bold text-primary bg-light" value="{{ suggested_no }}" readonly required oninput="syncPreview()">
+                            <button class="btn btn-outline-secondary" type="button" onclick="toggleEdit()">🔓</button>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="fw-bold small">INVOICE DATE</label>
+                        <input type="date" name="invoice_date" id="invoice_date" class="form-control" required oninput="syncPreview()">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="fw-bold small">CUSTOMER</label>
+                        <select name="customer_id" id="customer_id" class="form-select" required onchange="syncPreview()">
+                            <option value="">Select Customer...</option>
+                            {% for c in customers %}
+                            <option value="{{c.id}}" data-currency="{{c.currency}}" data-name="{{c.company_name}}" data-address="{{c.address}}" data-taxid="{{c.tax_id}}">{{c.company_name}}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="bg-light p-3 border rounded mb-4">
+                    <label class="fw-bold small mb-2 text-primary">SERVICES & LINE ITEMS</label>
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr class="small text-muted">
+                                <th style="width: 40%;">Project</th>
+                                <th style="width: 35%;">Service</th>
+                                <th style="width: 20%;">Amount</th>
+                                <th style="width: 5%;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="items_body">
+                            <tr class="service-row">
+                                <td>
+                                    <select name="project_ids[]" class="form-select form-select-sm proj-select" required onchange="syncPreview()">
+                                        <option value="">Select Project...</option>
+                                        {% for p in projects %}
+                                        <option value="{{p.id}}" data-name="{{p.project_name}}">{{p.project_name}}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="service_ids[]" class="form-select form-select-sm serv-select" onchange="syncPreview()">
+                                        <option value="">Select Service...</option>
+                                        {% for s in services %}
+                                        <option value="{{s.id}}" data-name="{{s.service_name}}">{{s.service_name}}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td><input type="number" step="0.01" name="amounts[]" class="form-control form-control-sm item-amount" placeholder="0.00" oninput="syncPreview()"></td>
+                                <td><button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="removeRow(this)">✕</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <button type="button" class="btn btn-sm btn-primary" onclick="addRow()">+ Add Another Service</button>
+                </div>
+
+                <div class="bg-white p-3 border rounded mb-4 shadow-sm">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <label class="fw-bold small text-primary">PAYMENT STRUCTURE</label>
+                        <div class="btn-group btn-group-sm">
+                            <input type="radio" class="btn-check" name="payment_structure" id="pay_full" value="full" checked onclick="toggleSlabs()">
+                            <label class="btn btn-outline-primary" for="pay_full">Full (100%)</label>
+                            <input type="radio" class="btn-check" name="payment_structure" id="pay_milestone" value="milestone" onclick="toggleSlabs()">
+                            <label class="btn btn-outline-primary" for="pay_milestone">Milestone-based</label>
+                        </div>
+                    </div>
+                    <div id="slab_container" style="display: none;">
+                        <table class="table table-sm border">
+                            <tbody id="slab_body">
+                                <tr class="slab-row">
+                                    <td><input type="text" name="slab_names[]" class="form-control form-control-sm slab-name" placeholder="Slab Name" oninput="syncPreview()"></td>
+                                    <td><input type="number" name="slab_percentages[]" class="form-control form-control-sm slab-perc" value="0" oninput="syncPreview()"></td>
+                                    <td><input type="text" class="form-control form-control-sm slab-calculated bg-light" readonly value="0.00"></td>
+                                    <td><button type="button" class="btn btn-sm text-danger" onclick="removeSlab(this)">✕</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addSlab()">+ Add Slab</button>
+                        <div id="slab_error" class="text-danger small mt-2" style="display:none;">⚠️ Total must be 100%</div>
+                    </div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <label class="fw-bold small">TAX TYPE</label>
+                        <select name="tax_type" id="tax_type" class="form-select" onchange="syncPreview()">
+                            <option value="GST">GST (CGST 9% + SGST 9%)</option>
+                            <option value="IGST">IGST (18%)</option>
+                            <option value="NONE">NONE (0%)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="fw-bold small">TAX AMOUNT</label>
+                        <input type="number" step="0.01" name="tax_amount" id="tax_amount" class="form-control bg-light" readonly>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="fw-bold small">GRAND TOTAL</label>
+                        <input type="number" step="0.01" name="total_amount" id="grand_total_input" class="form-control bg-light fw-bold" readonly>
+                    </div>
+                </div>
+
+                <div class="text-end">
+                    <button type="button" class="btn btn-outline-primary px-4" data-bs-toggle="modal" data-bs-target="#previewModal">Preview & Print</button>
+                    <button type="submit" id="saveInvoiceBtn" class="btn btn-success px-5 shadow">Save Invoice</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl"> <div class="modal-content">
+            <div class="modal-header no-print">
+                <h5 class="modal-title">Invoice Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 bg-light">
+                
+                <div class="invoice-box bg-white mx-auto" id="printableInvoice">
+                    
+                    <div class="row mb-2">
+                        <div class="col-4">
+                            <img src="{{ url_for('static', filename='logo.png') }}" style="max-height: 50px;" class="mb-2">
+                        </div>
+                        <div class="col-4 text-center mt-3">
+                            <h5 class="fw-bold mb-1 mt-5">TAX INVOICE</h5>
+                            <p class="text-warning small fw-bold mt-0" style="font-size: 14pt;">ORIGINAL FOR RECIPIENT</p>
+                        </div>
+                        <div class="col-4 text-end">
+                            <h5 class="fw-bold mb-0 text-nowrap" style="font-size: 14pt;">Valency Networks Pvt. Ltd.</h5>
+                            <div style="font-size: 10pt; line-height: 1.3;">
+                                <span>GST No : 27AAKCV1496Q1ZC</span><br>
+                                <span>PAN No : AAKCV1496Q</span><br>
+                                <span>SAC : 998313</span><br>
+                                <span>UDYAM-MH-26-0676862</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-4 mt-5">
+                        <div class="col-7">
+                            <p class="mb-0 fw-bold">To</p>
+                            <div id="p_customer_name" class="fw-bold mb-1" style="font-size: 13pt;">ABC pvt ltd</div>
+                            <div id="p_customer_address" class="text-muted" style="white-space: pre-wrap;">address 1</div>
+                            <div class="mt-4 fw-bold">GST No. - <span id="p_customer_gst">27000000000</span></div>
+                        </div>
+                        <div class="col-5 text-end">
+                            <div class="d-inline-flex text-start align-items-stretch p-2">
+                                <div class="pe-2 text-end fw-bold" style="line-height: 1.5;">
+                                    <div>INVOICE NUMBER</div>
+                                    <div>INVOICE DATE</div>
+                                </div>
+                                <div style="border-left: 1px solid #000; width: 1px; margin: 0 10px;"></div>
+                                <div class="ps-1" style="line-height: 1.5;">
+                                    <div id="p_invoice_no">---</div>
+                                    <div id="p_invoice_date">---</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <table class="table table-bordered border-dark mb-0 main-invoice-table">
+                        <thead class="text-center bg-light fw-bold">
+                            <tr>
+                                <th style="width: 10%;">Count</th>
+                                <th style="width: 65%;">DESCRIPTION</th>
+                                <th style="width: 25%;">AMOUNT</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="text-center align-top pt-3">1</td>
+                                <td id="p_description" class="align-top pt-3" contenteditable="true" style="outline: none; line-height: 1.6; min-height: 450px;">
+                                </td>
+                                <td id="p_amount_col" class="text-end align-top pt-3 fw-bold" contenteditable="true" style="outline: none; line-height: 1.6;">
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot class="border-top border-dark">
+    <tr>
+        <td colspan="2" class="p-0 border-dark" style="vertical-align: top;">
+           <div class="d-flex h-100">
+    <div class="p-2 flex-grow-1" 
+         contenteditable="true" 
+         style="outline: none; min-height: 100px; font-size: 12pt; font-family: 'Calibri', 'Candara', sans-serif;">
+    </div>
+
+    <div style="width: 1px; background-color: #000;"></div>
+
+    <div class="d-flex flex-column justify-content-start pt-2 px-2" style="width: 120px;">
+        <div class="fw-bold mb-3" style="font-family: 'Calibri', sans-serif;">Subtotal</div>
+        <div class="fw-bold" style="font-family: 'Calibri', sans-serif;">Misc</div>
+    </div>
+</div>
+        </td>
+
+        <td class="p-0 border-dark">
+            <div class="d-flex flex-column h-100 text-end fw-bold">
+                <div class="p-2 border-bottom border-dark" id="p_subtotal_final" style="min-height: 50px;">0.00</div>
+                <div class="p-2">0.00</div>
+            </div>
+        </td>
+    </tr>
+
+    <tr>
+        <td colspan="2" class="text-end border-0 pt-3 fw-bold align-middle">Total</td>
+        <td class="text-end fw-bold bg-light pt-3" style="border: 2px solid #000 !important;">
+            <div id="p_total_final" style="font-size: 14pt; line-height: 1;">0.00</div>
+            <div style="font-size: 8pt; font-weight: normal; margin-top: 4px;">Amount in <span id="p_curr">INR</span> unless specified</div>
+        </td>
+    </tr>
+</tfoot>
+                    </table>
+
+                    <div class="row mt-4 align-items-end">
+                        <div class="col-3 text-center">
+                            <img src="{{ url_for('static', filename='stamp.png') }}" style="max-height: 80px; display: block; margin: 0 auto;">
+                            <p class="fw-bold mb-0">Prashant Phatak</p>
+                            <p class="m-0" style="font-size: 9pt;">Founder, Director</p>
+                        </div>
+                        <div class="col-9">
+                            <div class="ps-3 border-start border-dark" style="font-size: 10pt; line-height: 1.4;">
+                                <p class="fw-bold mb-1">Cheques Payable : Valency Networks Pvt. Ltd.</p>
+                                <b>Bank name :</b> IDBI, Ganeshnagar (Erandawane), Pune, India 411004<br>
+                                <b>Account number :</b> 0588102000014234<br>
+                                <div class="d-flex gap-3">
+                                    <span><b>IFSC Code :</b> IBKL0000588</span>
+                                    <span><b>Swift Code :</b> IBKLINBB007</span>
+                                </div>
+                                <b>Address :</b> 401 Ekdanta, Mehendale Garage Road, Erandawane, Pune 411004, India<br>
+                                <b>Web :</b> https://www.valencynetworks.com &nbsp; <b>Email :</b> prashant@valencynetworks.com
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer no-print">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="window.print()">Print Now</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* 1. Screen Preview Styling */
+    .invoice-box { 
+        width: 100%; 
+        max-width: 850px; 
+        padding: 40px;
+        color: #000; 
+        font-family: 'Calibri', 'Candara', sans-serif; 
+        font-size: 12pt;
+        border: 2px solid #000 !important;
+        background: #fff;
+    }
+
+    /* Solid Table Borders */
+    .main-invoice-table.table-bordered,
+    .main-invoice-table.table-bordered td,
+    .main-invoice-table.table-bordered th {
+        border: 1px solid #000 !important;
+    }
+
+    /* 2. PRINT LOGIC - FULL PAGE WIDE */
+    @media print {
+        @page { size: A4; margin: 10mm; }
+        
+        body * { visibility: hidden; }
+        
+        /* Show ONLY the modal content */
+        #previewModal, #previewModal * { visibility: visible; }
+        
+        #previewModal {
+            position: absolute;
+            left: 0; top: 0;
+            width: 100%;
+        }
+
+        .modal-content, .modal-body { border: none !important; padding: 0 !important; width: 100% !important; }
+        .modal-dialog { max-width: 100% !important; margin: 0 !important; }
+
+        .invoice-box {
+            border: 2px solid #000 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 20px !important;
+            box-shadow: none !important;
+        }
+
+        .no-print { display: none !important; }
+    }
+</style>
+
+<script>
+    function toggleEdit() {
+        const el = document.getElementById('invoice_number');
+        el.readOnly = !el.readOnly;
+        el.classList.toggle('bg-light');
+    }
+
+    function addRow() {
+        const body = document.getElementById('items_body');
+        const row = document.querySelector('.service-row').cloneNode(true);
+        row.querySelectorAll('input').forEach(i => i.value = "");
+        body.appendChild(row);
+    }
+
+    function removeRow(btn) {
+        if(document.querySelectorAll('.service-row').length > 1) btn.closest('tr').remove();
+        syncPreview();
+    }
+
+    function toggleSlabs() {
+        document.getElementById('slab_container').style.display = document.getElementById('pay_milestone').checked ? 'block' : 'none';
+        syncPreview();
+    }
+
+    function addSlab() {
+        const body = document.getElementById('slab_body');
+        const row = document.querySelector('.slab-row').cloneNode(true);
+        row.querySelectorAll('input').forEach(i => i.value = "");
+        body.appendChild(row);
+    }
+
+    function removeSlab(btn) {
+        if(document.querySelectorAll('.slab-row').length > 1) btn.closest('tr').remove();
+        syncPreview();
+    }
+
+    function syncPreview() {
+        let contractTotal = 0;
+        let descHTML = "";
+        let lineCount = 0;
+
+        document.getElementById('p_invoice_no').innerText = document.getElementById('invoice_number').value;
+        document.getElementById('p_invoice_date').innerText = document.getElementById('invoice_date').value;
+        
+        const cSel = document.getElementById('customer_id');
+        if(cSel.selectedIndex > 0) {
+            const opt = cSel.options[cSel.selectedIndex];
+            document.getElementById('p_customer_name').innerText = opt.dataset.name;
+            document.getElementById('p_customer_address').innerText = opt.dataset.address;
+            document.getElementById('p_customer_gst').innerText = opt.dataset.taxid;
+            document.getElementById('p_curr').innerText = opt.dataset.currency || "INR";
+        }
+
+        document.querySelectorAll('.service-row').forEach(r => {
+            let amt = parseFloat(r.querySelector('.item-amount').value) || 0;
+            const servSelect = r.querySelector('.serv-select');
+            let sName = servSelect.selectedIndex > 0 ? servSelect.selectedOptions[0].dataset.name : "[Service]";
+            contractTotal += amt;
+            descHTML += `<b>${sName} service</b><br>`;
+            lineCount++;
+        });
+
+        const isMilestone = document.getElementById('pay_milestone').checked;
+        let taxableBase = contractTotal;
+        let slabTotalPerc = 0;
+
+        if (isMilestone) {
+            taxableBase = 0;
+            document.querySelectorAll('.slab-row').forEach((r, idx) => {
+                let p = parseFloat(r.querySelector('.slab-perc').value) || 0;
+                let name = r.querySelector('.slab-name').value || `Slab ${idx+1}`;
+                let amt = (p/100) * contractTotal;
+                r.querySelector('.slab-calculated').value = amt.toFixed(2);
+                descHTML += `${name} :<br>`;
+                taxableBase += amt;
+                slabTotalPerc += p;
+                lineCount++;
+            });
+        }
+
+        descHTML += "<br>Ref :: as per Purchase order No.: 12993<br>";
+        lineCount += 2; 
+        
+        const marginGap = "<br><br><br><br>";
+        descHTML += marginGap;
+        descHTML += "Central GST [CGST] - 9%<br>State GST [SGST] - 9%<br>Integrated GST [IGST] - 18%";
+
+        let amtHTML = taxableBase.toFixed(2);
+        for(let i=0; i < lineCount; i++) { amtHTML += "<br>"; }
+        amtHTML += marginGap;
+
+        const taxType = document.getElementById('tax_type').value;
+        let taxAmt = 0;
+        if (taxType === 'GST') {
+            let half = taxableBase * 0.09;
+            taxAmt = half * 2;
+            amtHTML += `${half.toFixed(2)}<br>${half.toFixed(2)}<br>0.00`;
+        } else if (taxType === 'IGST') {
+            taxAmt = taxableBase * 0.18;
+            amtHTML += `0.00<br>0.00<br>${taxAmt.toFixed(2)}`;
+        } else {
+            amtHTML += `0.00<br>0.00<br>0.00`;
+        }
+
+        document.getElementById('p_description').innerHTML = descHTML;
+        document.getElementById('p_amount_col').innerHTML = amtHTML;
+        document.getElementById('tax_amount').value = taxAmt.toFixed(2);
+        document.getElementById('grand_total_input').value = (taxableBase + taxAmt).toFixed(2);
+        document.getElementById('p_subtotal_final').innerText = taxableBase.toFixed(2);
+        document.getElementById('p_total_final').innerText = (taxableBase + taxAmt).toFixed(2);
+
+        const saveBtn = document.getElementById('saveInvoiceBtn');
+        if (isMilestone && Math.round(slabTotalPerc) !== 100) {
+            document.getElementById('slab_error').style.display = 'block';
+            document.getElementById('slab_error').innerText = `Note: Total milestone is ${slabTotalPerc}% (Not 100%)`;
+        } else {
+            document.getElementById('slab_error').style.display = 'none';
+        }
+    }
+
+    document.getElementById('invoice_date').valueAsDate = new Date();
+    syncPreview();
+</script>
+{% endblock %}
