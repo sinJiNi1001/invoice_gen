@@ -28,7 +28,7 @@
                     <select id="filterStatus" class="form-select" onchange="filterContracts()">
                         <option value="all">Status: Show All</option>
                         <option value="Active">Active Only</option>
-                        <option value="not started">Not Started</option>
+                        <option value="Draft">Drafts</option>
                         <option value="Completed">Completed</option>
                         <option value="Terminated">Terminated</option>
                     </select>
@@ -49,21 +49,31 @@
                              style="width: 50px; height: 50px;">
                             <i class="fa-solid fa-file-signature fa-lg"></i>
                         </div>
+                        
                         <div class="me-auto">
                             <div class="fw-bold text-dark">{{ c.contract_name }}</div>
-                            <div class="small text-muted">
+                            <div class="small text-muted mb-1">
                                 {{ c.company_name }}
                                 {% if c.po_reference %}
                                     <span class="badge bg-light text-dark border ms-1">{{ c.po_reference }}</span>
                                 {% endif %}
                             </div>
+                            <div>
+                                {% for s_name in c.services %}
+                                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-10" style="font-size: 0.7rem;">
+                                        {{ s_name }}
+                                    </span>
+                                {% endfor %}
+                            </div>
                         </div>
+
                         <div class="me-4">
                             {% if c.status == 'Active' %}<span class="badge bg-success bg-opacity-10 text-success">Active</span>
-                            {% elif c.status == 'not started' %}<span class="badge bg-secondary bg-opacity-10 text-secondary">Not Started</span>
+                            {% elif c.status == 'Draft' %}<span class="badge bg-secondary bg-opacity-10 text-secondary">Draft</span>
                             {% elif c.status == 'Completed' %}<span class="badge bg-dark">Completed</span>
                             {% else %}<span class="badge bg-danger bg-opacity-10 text-danger">{{ c.status }}</span>{% endif %}
                         </div>
+
                         <div class="text-end">
                             <div class="fw-bold text-dark">{{ "{:,.2f}".format(c.total_value) }} {{ c.currency }}</div>
                             <div class="small text-muted">{{ c.slabs|length }} Slabs</div>

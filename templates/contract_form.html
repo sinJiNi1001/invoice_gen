@@ -82,6 +82,45 @@
            value="{{ contract.po_reference if contract and contract.po_reference else '' }}" 
            placeholder="e.g. PO-2026-998 or Ref: MSA-V2">
 </div>
+<div class="mb-3">
+    <label class="form-label fw-bold small text-uppercase text-muted">Service Scope</label>
+    
+    <div class="card bg-white border shadow-sm" style="max-height: 150px; overflow-y: auto;">
+        <div class="card-body p-2">
+            <div class="d-flex flex-wrap gap-1">
+                {% for service in services %}
+                
+                <input type="checkbox" class="btn-check" name="service_ids" id="svc_{{ service.id }}" value="{{ service.id }}" autocomplete="off"
+                    {% if current_service_ids and service.id in current_service_ids %}checked{% endif %}>
+                
+                <label class="btn btn-outline-secondary border-0 bg-light rounded-1 px-2 py-1" 
+                       for="svc_{{ service.id }}" 
+                       style="font-size: 11px; font-weight: 600;">
+                    <i class="fa-solid fa-check me-1 d-none"></i>
+                    {{ service.service_name }}
+                </label>
+                
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Selected State - Turns Blue */
+    .btn-check:checked + .btn {
+        background-color: #0d6efd !important; /* Blue */
+        color: white !important;
+        background-image: none;
+    }
+    .btn-check:checked + .btn i {
+        display: inline-block !important; /* Show checkmark */
+    }
+    /* Hover State - Slight Grey */
+    .btn:hover {
+        background-color: #e9ecef;
+    }
+</style>
                         <div class="mb-3">
     <label class="form-label">Total Contract Value</label>
     <div class="input-group">
