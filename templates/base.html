@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Valency Invoice System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        .header-ui { height: 70px; border-bottom: 2px solid #afbac6; background: #fff; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; }
+        .sidebar { min-height: calc(100vh - 70px); background: #f8f9fa; border-right: 1px solid #dee2e6; padding: 15px 0; }
+        
+        /* Main Link Styling - Simplified to one button */
+        .nav-link { color: #444; font-weight: 600; padding: 12px 20px; border-radius: 0; display: flex; align-items: center; border-left: 4px solid transparent; }
+        .nav-link:hover { background: #e9ecef; color: #000; }
+        .nav-link.active { background: #e9ecef; border-left: 4px solid #0d6efd; color: #0d6efd; }
+        .nav-link i { margin-right: 10px; color: #0d6efd; width: 20px; }
+        
+        .logo-img { height: 50px; }
+
+        @media print { .header-ui, .sidebar { display: none !important; } .col-md-10 { width: 100% !important; margin: 0 !important; padding: 0 !important; } }
+    </style>
+</head>
+<body>
+    <div class="header-ui">
+        <div class="app-logo">
+            <img src="/static/App_logo.png" alt="App Logo" class="logo-img">
+        </div>
+        <div class="valency-logo">
+            <img src="/static/logo.png" alt="Valency Logo" class="logo-img">
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-2 sidebar">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                         <a class="nav-link {% if request.endpoint == 'edit_list' %}active{% endif %}" href="{{ url_for('edit_list') }}">
+                            <i class="fa-solid fa-flag"></i> Invoices
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+
+            <main class="col-md-10 p-4">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
