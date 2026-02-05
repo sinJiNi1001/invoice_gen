@@ -19,8 +19,9 @@
                         <div class="mb-3">
                             <label class="form-label fw-bold text-danger">Contract Status</label>
                             <select name="status" class="form-select border-danger fw-bold">
-                                <option value="not started" {% if contract.status == 'not started' %}selected{% endif %}>not started</option>
+                                <option value="Draft" {% if contract.status == 'Draft' %}selected{% endif %}>Draft (Not Started)</option>
                                 <option value="Active" {% if contract.status == 'Active' %}selected{% endif %}>Active</option>
+                                <option value="On Hold" {% if contract.status == 'On Hold' %}selected{% endif %}>On Hold</option>
                                 <option value="Completed" {% if contract.status == 'Completed' %}selected{% endif %}>Completed</option>
                                 <option value="Terminated" {% if contract.status == 'Terminated' %}selected{% endif %}>Terminated</option>
                             </select>
@@ -30,21 +31,21 @@
                         <div class="mb-3">
                             <label class="form-label">Customer</label>
                             <select name="customer_id" id="customer_select" class="form-select" onchange="showCustomerDetails()" required>
-    <option value="">-- Select Customer --</option>
-    {% for c in customers %}
-    <option value="{{ c.id }}" 
-            {% if contract and contract.customer_id == c.id %}selected{% endif %}
-            data-gst="{{ c.gst_number }}" 
-            data-gst-status="{{ c.gst_status }}"
-            data-gst-type="{{ c.gst_type }}"
-            data-address="{{ c.address }}" 
-            data-city="{{ c.city }}"
-            data-state="{{ c.state }}"
-            data-country="{{ c.country }}"
-            data-currency="{{ c.currency }}"> {{ c.company_name }}
-    </option>
-    {% endfor %}
-</select>
+                                <option value="">-- Select Customer --</option>
+                                {% for c in customers %}
+                                <option value="{{ c.id }}" 
+                                        {% if contract and contract.customer_id == c.id %}selected{% endif %}
+                                        data-gst="{{ c.gst_number }}" 
+                                        data-gst-status="{{ c.gst_status }}"
+                                        data-gst-type="{{ c.gst_type }}"
+                                        data-address="{{ c.address }}" 
+                                        data-city="{{ c.city }}"
+                                        data-state="{{ c.state }}"
+                                        data-country="{{ c.country }}"
+                                        data-currency="{{ c.currency }}"> {{ c.company_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
                             
                             <div id="customer_info_card" class="card bg-light border-0 small mt-2 d-none">
                                 <div class="card-body py-2">
@@ -76,58 +77,58 @@
                             <label class="form-label">Contract Title</label>
                             <input type="text" name="contract_name" class="form-control" value="{{ contract.contract_name if contract else '' }}" placeholder="e.g. Annual Maintenance 2026" required>
                         </div>
-<div class="mb-3">
-    <label class="form-label text-muted small">PO / Agreement Ref (Optional)</label>
-    <input type="text" name="po_reference" class="form-control" 
-           value="{{ contract.po_reference if contract and contract.po_reference else '' }}" 
-           placeholder="e.g. PO-2026-998 or Ref: MSA-V2">
-</div>
-<div class="mb-3">
-    <label class="form-label fw-bold small text-uppercase text-muted">Service Scope</label>
-    
-    <div class="card bg-white border shadow-sm" style="max-height: 150px; overflow-y: auto;">
-        <div class="card-body p-2">
-            <div class="d-flex flex-wrap gap-1">
-                {% for service in services %}
-                
-                <input type="checkbox" class="btn-check" name="service_ids" id="svc_{{ service.id }}" value="{{ service.id }}" autocomplete="off"
-                    {% if current_service_ids and service.id in current_service_ids %}checked{% endif %}>
-                
-                <label class="btn btn-outline-secondary border-0 bg-light rounded-1 px-2 py-1" 
-                       for="svc_{{ service.id }}" 
-                       style="font-size: 11px; font-weight: 600;">
-                    <i class="fa-solid fa-check me-1 d-none"></i>
-                    {{ service.service_name }}
-                </label>
-                
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<style>
-    /* Selected State - Turns Blue */
-    .btn-check:checked + .btn {
-        background-color: #0d6efd !important; /* Blue */
-        color: white !important;
-        background-image: none;
-    }
-    .btn-check:checked + .btn i {
-        display: inline-block !important; /* Show checkmark */
-    }
-    /* Hover State - Slight Grey */
-    .btn:hover {
-        background-color: #e9ecef;
-    }
-</style>
                         <div class="mb-3">
-    <label class="form-label">Total Contract Value</label>
-    <div class="input-group">
-        <span class="input-group-text fw-bold" id="currency_symbol">$</span>
-        <input type="number" id="total_value" name="total_value" class="form-control fw-bold" step="0.01" value="{{ contract.total_value if contract else '' }}" oninput="updateBalance()" required>
-    </div>
-</div>
+                            <label class="form-label text-muted small">PO / Agreement Ref (Optional)</label>
+                            <input type="text" name="po_reference" class="form-control" 
+                                   value="{{ contract.po_reference if contract and contract.po_reference else '' }}" 
+                                   placeholder="e.g. PO-2026-998 or Ref: MSA-V2">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-uppercase text-muted">Service Scope</label>
+                            
+                            <div class="card bg-white border shadow-sm" style="max-height: 150px; overflow-y: auto;">
+                                <div class="card-body p-2">
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% for service in services %}
+                                        
+                                        <input type="checkbox" class="btn-check" name="service_ids" id="svc_{{ service.id }}" value="{{ service.id }}" autocomplete="off"
+                                            {% if current_service_ids and service.id in current_service_ids %}checked{% endif %}>
+                                        
+                                        <label class="btn btn-outline-secondary border-0 bg-light rounded-1 px-2 py-1" 
+                                               for="svc_{{ service.id }}" 
+                                               style="font-size: 11px; font-weight: 600;">
+                                            <i class="fa-solid fa-check me-1 d-none"></i>
+                                            {{ service.service_name }}
+                                        </label>
+                                        
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <style>
+                            /* Selected State - Turns Blue */
+                            .btn-check:checked + .btn {
+                                background-color: #0d6efd !important; /* Blue */
+                                color: white !important;
+                                background-image: none;
+                            }
+                            .btn-check:checked + .btn i {
+                                display: inline-block !important; /* Show checkmark */
+                            }
+                            /* Hover State - Slight Grey */
+                            .btn:hover {
+                                background-color: #e9ecef;
+                            }
+                        </style>
+                        <div class="mb-3">
+                            <label class="form-label">Total Contract Value</label>
+                            <div class="input-group">
+                                <span class="input-group-text fw-bold" id="currency_symbol">$</span>
+                                <input type="number" id="total_value" name="total_value" class="form-control fw-bold" step="0.01" value="{{ contract.total_value if contract else '' }}" oninput="updateBalance()" required>
+                            </div>
+                        </div>
                         <div class="row g-2 mb-3">
                             <div class="col-6">
                                 <label class="form-label small">Start Date</label>
@@ -192,9 +193,15 @@
     window.onload = function() {
         showCustomerDetails(); 
         
-        // Load Slabs
-        {% if slabs %}
-            {% for slab in slabs %}
+        // NOTE TO DEVELOPER: 
+        // VS Code will show "Expression expected" errors below. THIS IS NORMAL.
+        // It's because we are mixing Python/Jinja syntax inside JavaScript.
+        // The code IS VALID and will run correctly in the browser.
+        
+        // CRITICAL FIX: Changed 'if slabs' to 'if contract and contract.slabs' 
+        // This ensures milestones don't disappear when editing!
+        {% if contract and contract.slabs %}
+            {% for slab in contract.slabs %}
                 addSlab("{{ slab.slab_name }}", "{{ slab.due_date }}", "{{ slab.amount }}", "{{ slab.status }}");
             {% endfor %}
         {% else %}

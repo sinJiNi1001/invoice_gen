@@ -2,48 +2,38 @@
 {% block content %}
 <div class="container mt-4" style="font-family: 'Calibri', sans-serif;">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Service Selection & Management</h2>
+        <h2>Service Management</h2>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newServiceModal">
             <i class="fas fa-plus me-2"></i>Add New Service
         </button>
     </div>
-
+ 
     <div class="card shadow-sm">
         <div class="card-body">
-            <table class="table table-bordered" id="serviceSelectionTable">
+            <table class="table table-hover">
                 <thead class="table-light">
                     <tr>
-                        <th style="width: 30%;">Service Name</th>
-                        <th style="width: 20%;">Service ID</th>
-                        <th>Description</th>
-                        <th style="width: 50px;"></th>
+                        <th style="width: 100px;">ID</th>
+                        <th>Service Name</th>
                     </tr>
                 </thead>
-                <tbody id="serviceBody">
+                <tbody>
+                    {% for s in services %}
                     <tr>
-                        <td>
-                            <select class="form-select service-dropdown" onchange="updateServiceDetails(this)">
-                                <option value="" selected disabled>Choose Service...</option>
-                                {% for s in services %}
-                                <option value="{{ s.id }}" data-sid="{{ s.service_id }}" data-desc="{{ s.description }}">
-                                    {{ s.service_name }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </td>
-                        <td><input type="text" class="form-control sid-field" readonly></td>
-                        <td><textarea class="form-control desc-field" rows="1" readonly></textarea></td>
-                        <td><button type="button" class="btn btn-outline-danger btn-sm" onclick="removeRow(this)"><i class="fas fa-times"></i></button></td>
+                        <td><strong>{{ loop.index }}</strong></td>
+                        <td>{{ s.service_name }}</td>
                     </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="2" class="text-center text-muted">No services found. Add one above!</td>
+                    </tr>
+                    {% endfor %}
                 </tbody>
             </table>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="addRow()">
-                <i class="fas fa-plus me-1"></i>Add Another Service
-            </button>
         </div>
     </div>
 </div>
-
+ 
 <div class="modal fade" id="newServiceModal" tabindex="-1">
     <div class="modal-dialog">
         <form method="POST" class="modal-content">
@@ -53,56 +43,15 @@
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label>Service Name</label>
-                    <input type="text" name="service_name" class="form-control" required>
-                </div>
-                <div class="mb-3">
-                    <label>Service ID (Code)</label>
-                    <input type="text" name="service_id" class="form-control" placeholder="e.g. VAPT-WEB-01">
-                </div>
-                <div class="mb-3">
-                    <label>Description</label>
-                    <textarea name="description" class="form-control" rows="3"></textarea>
+                    <label class="form-label">Service Name</label>
+                    <input type="text" name="service_name" class="form-control" placeholder="e.g. VAPT" required>
                 </div>
             </div>
             <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="submit" class="btn btn-success">Save to Database</button>
             </div>
         </form>
     </div>
 </div>
-
-<script>
-// Function to update ID and Description automatically
-function updateServiceDetails(selectElement) {
-    const selectedOption = selectElement.options[selectElement.selectedIndex];
-    const row = selectElement.closest('tr');
-    
-    const sid = selectedOption.getAttribute('data-sid');
-    const desc = selectedOption.getAttribute('data-desc');
-    
-    row.querySelector('.sid-field').value = sid || 'N/A';
-    row.querySelector('.desc-field').value = desc || '';
-}
-
-// Function to add multiple rows
-function addRow() {
-    const tbody = document.getElementById('serviceBody');
-    const firstRow = tbody.querySelector('tr');
-    const newRow = firstRow.cloneNode(true);
-    
-    // Reset inputs in the new row
-    newRow.querySelectorAll('input, textarea').forEach(i => i.value = '');
-    newRow.querySelector('select').selectedIndex = 0;
-    
-    tbody.appendChild(newRow);
-}
-
-function removeRow(btn) {
-    const row = btn.closest('tr');
-    if (document.querySelectorAll('#serviceBody tr').length > 1) {
-        row.remove();
-    }
-}
-</script>
 {% endblock %}

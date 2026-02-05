@@ -1,18 +1,19 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
-import mysql.connector
-from datetime import date
-import datetime
+import io
 import os
-from dotenv import load_dotenv
-# app.py
-from models import db, Customer, Project, Invoice, PaymentSlab, Service, Contract, ContractSlab, ContractService
-
-from typing import List, Dict, Any  # <--- Add this line
-
-# --- IMPORTS FOR INVOICE LOGIC (SQLAlchemy) ---
-from models import db, Customer, Project, Invoice, PaymentSlab, Service
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, make_response
+from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import desc, extract
 from sqlalchemy.exc import IntegrityError
+import mysql.connector
+from datetime import datetime, date
+from dotenv import load_dotenv
+from typing import List, Dict, Any
+
+# --- PDF LIBRARY ---
+from xhtml2pdf import pisa 
+
+# Import Models
+from models import db, Customer, Project, Invoice, PaymentSlab, Service, Contract, ContractSlab, contract_services
 
 load_dotenv()
 
@@ -20,16 +21,12 @@ app = Flask(__name__)
 app.secret_key = "valency_secret"
 
 # ==========================================
-# 1. DATABASE CONFIGURATION (HYBRID)
+# DATABASE CONFIGURATION
 # ==========================================
-
-# A. SQLAlchemy Config (For INVOICES)
-# Ensure this password matches your MySQL password!
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:Sinu%40123@localhost/invoice_generator'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
-# B. Raw MySQL Config (For CONTRACTS & CUSTOMERS)
 db_config = {
     'user': 'root',
     'password': 'Sinu@123', 
@@ -38,26 +35,22 @@ db_config = {
 }
 
 def get_db_connection():
-    """Helper for Raw SQL connections"""
     return mysql.connector.connect(**db_config)
 
 def fetch_as_dict(cursor) -> List[Dict[str, Any]]:
-    """Helper to convert cursor rows into a list of dictionaries"""
     rows = cursor.fetchall()
     return [dict(row) for row in rows]
 
 # --- ROOT ---
 @app.route('/')
 def dashboard():
-    return redirect(url_for('edit_list')) # Redirect to Invoices by default
-
+    return redirect(url_for('edit_list'))
 
 # ==========================================
-# 2. INVOICE ROUTES (Restored Logic)
+# INVOICE ROUTES
 # ==========================================
-
 def get_next_invoice_number():
-    current_year = datetime.datetime.now().year
+    current_year = datetime.now().year
     prefix = str(current_year)
     last_invoice = Invoice.query.filter(Invoice.invoice_number.like(f"{prefix}%"))\
                                 .order_by(desc(Invoice.id)).first()
@@ -75,22 +68,23 @@ def get_next_invoice_number():
 def create_invoice():
     customers = Customer.query.all()
     projects = Project.query.all()
-    services = Service.query.all()  # <--- THIS WAS MISSING
+    services = Service.query.all()
     suggested_no = get_next_invoice_number()
 
     if request.method == 'POST':
-        # ... (Keep existing POST logic) ...
         project_ids = request.form.getlist('project_ids[]')
         primary_project_id = project_ids[0] if project_ids and project_ids[0].strip() else None
         
         try:
+            invoice_date_str = request.form['invoice_date']
+            
             new_inv = Invoice(
                 invoice_number=request.form.get('invoice_number'),
                 customer_id=request.form.get('customer_id'),
                 project_id=primary_project_id, 
                 total_amount=float(request.form.get('total_amount', 0)),
                 tax_amount=float(request.form.get('tax_amount', 0)),
-                invoice_date=request.form.get('invoice_date'),
+                invoice_date=datetime.strptime(invoice_date_str, '%Y-%m-%d'),
                 tax_type=request.form.get('tax_type'),
                 status='Raised',
                 amount_received=0.0,
@@ -107,27 +101,19 @@ def create_invoice():
             db.session.rollback()
             flash(f"Database Error: {str(e)}", "danger")
 
-    # Pass 'services' to the template here
     return render_template('invoice_create.html', customers=customers, projects=projects, services=services, suggested_no=suggested_no)
-
-@app.route('/get_slabs/<int:project_id>')
-def get_slabs(project_id):
-    slabs = PaymentSlab.query.filter_by(project_id=project_id).all()
-    return jsonify([{'id': s.id, 'name': s.slab_name, 'amount': float(s.amount)} for s in slabs])
 
 @app.route('/invoice/edit')
 def edit_list():
     page = request.args.get('page', 1, type=int)
-    now = datetime.datetime.now()
+    now = datetime.now()
     
     current_total_months = now.year * 12 + (now.month - 1)
     target_total_months = current_total_months - (page - 1)
     t_year = target_total_months // 12
     t_month = (target_total_months % 12) + 1
-    
-    display_label = datetime.date(t_year, t_month, 1).strftime('%B %Y')
+    display_label = date(t_year, t_month, 1).strftime('%B %Y')
 
-    # Pagination Logic
     oldest_invoice = Invoice.query.order_by(Invoice.invoice_date.asc()).first()
     if oldest_invoice:
         oldest_date = oldest_invoice.invoice_date
@@ -136,7 +122,6 @@ def edit_list():
     else:
         total_pages = 1
 
-    # Filters
     f_day = request.args.get('day', type=int)
     f_month = request.args.get('month', type=int)
     f_year = request.args.get('year', type=int)
@@ -154,7 +139,6 @@ def edit_list():
         )
 
     all_invoices = query_all.order_by(Invoice.invoice_date.desc()).all()
-
     current_month_query = Invoice.query.filter(
         extract('month', Invoice.invoice_date) == now.month,
         extract('year', Invoice.invoice_date) == now.year
@@ -172,16 +156,23 @@ def edit_form(id):
     invoice = Invoice.query.get_or_404(id)
     customers = Customer.query.all()
     projects = Project.query.all()
-    services = Service.query.all() # <--- THIS WAS MISSING
+    services = Service.query.all()
     
     current_project_slabs = []
     if invoice.project_id:
         current_project_slabs = PaymentSlab.query.filter_by(project_id=invoice.project_id).all()
 
     if request.method == 'POST':
-        # ... (Keep existing POST logic) ...
         try:
-            # ... (Update logic) ...
+            invoice.invoice_number = request.form.get('invoice_number')
+            invoice.customer_id = request.form.get('customer_id')
+            invoice.project_id = request.form.get('project_id')
+            invoice.total_amount = float(request.form.get('total_amount', 0))
+            invoice.tax_amount = float(request.form.get('tax_amount', 0))
+            invoice.invoice_date = datetime.strptime(request.form['invoice_date'], '%Y-%m-%d')
+            invoice.tax_type = request.form.get('tax_type')
+            invoice.billing_type = request.form.get('payment_structure')
+
             db.session.commit()
             flash("Invoice updated successfully!", "success")
             return redirect(url_for('edit_list'))
@@ -189,14 +180,17 @@ def edit_form(id):
             db.session.rollback()
             flash(f"Update Error: {str(e)}", "danger")
     
-    # Pass 'services' to the template here
     return render_template('invoice_edit.html', invoice=invoice, customers=customers, projects=projects, services=services, slabs=current_project_slabs)
 
+@app.route('/get_slabs/<int:project_id>')
+def get_slabs(project_id):
+    slabs = PaymentSlab.query.filter_by(project_id=project_id).all()
+    return jsonify([{'id': s.id, 'name': s.slab_name, 'amount': float(s.amount)} for s in slabs])
+
 
 # ==========================================
-# 3. CUSTOMER ROUTES (Raw SQL)
+# CUSTOMER ROUTES (RESTORED)
 # ==========================================
-
 @app.route('/customers')
 def list_customers():
     search = request.args.get('search', '')
@@ -222,7 +216,6 @@ def list_customers():
     cursor.execute(query, tuple(params))
     customers = fetch_as_dict(cursor)
     conn.close()
-    
     return render_template('customer_list.html', customers=customers, search_term=search, country_filter=country, sort_by=sort_by)
 
 @app.route('/customers/new', methods=('GET', 'POST'))
@@ -291,123 +284,162 @@ def edit_customer(id):
     conn.close()
     return render_template('customer_form.html', customer=customer)
 
-
-# ==========================================
-# 4. CONTRACT ROUTES (Raw SQL)
-# ==========================================
-
 # ==========================================
 # CONTRACT ROUTES
 # ==========================================
-
 @app.route('/contracts')
 def list_contracts():
-    contracts = Contract.query.order_by(Contract.created_at.desc()).all()
+    contracts = Contract.query.order_by(Contract.id.desc()).all()
     return render_template('contract_list.html', contracts=contracts)
 
 @app.route('/contracts/new', methods=['GET', 'POST'])
-def create_contract():
+def new_contract():
     if request.method == 'POST':
         try:
-            # 1. Create Contract
-            new_contract = Contract(
+            new_c = Contract(
                 customer_id=request.form['customer_id'],
                 contract_name=request.form['contract_name'],
-                po_reference=request.form['po_reference'],
-                total_value=request.form['total_value'],
-                start_date=request.form['start_date'] or None,
-                end_date=request.form['end_date'] or None,
-                status='Draft'
+                po_reference=request.form.get('po_reference'),
+                total_value=float(request.form.get('total_value', 0)),
+                start_date=datetime.strptime(request.form['start_date'], '%Y-%m-%d'),
+                end_date=datetime.strptime(request.form['end_date'], '%Y-%m-%d'),
+                status=request.form.get('status', 'Draft')
             )
-            db.session.add(new_contract)
-            db.session.flush() # Get ID
-
-            # 2. Add Services
-            service_ids = request.form.getlist('service_ids')
-            for s_id in service_ids:
-                db.session.add(ContractService(contract_id=new_contract.id, service_id=s_id))
-
-            # 3. Add Milestones (Slabs)
-            slab_names = request.form.getlist('slab_names[]')
-            slab_amounts = request.form.getlist('slab_amounts[]')
-            slab_dates = request.form.getlist('slab_dates[]')
             
-            for i in range(len(slab_names)):
-                if slab_names[i]:
-                    db.session.add(ContractSlab(
-                        contract_id=new_contract.id,
-                        slab_name=slab_names[i],
-                        amount=slab_amounts[i],
-                        due_date=slab_dates[i] or None,
-                        status='Pending'
-                    ))
+            service_ids = request.form.getlist('service_ids')
+            if service_ids:
+                selected_services = Service.query.filter(Service.id.in_(service_ids)).all()
+                new_c.services.extend(selected_services)
 
+            db.session.add(new_c)
             db.session.commit()
             flash('Contract created successfully!', 'success')
             return redirect(url_for('list_contracts'))
-
         except Exception as e:
             db.session.rollback()
             flash(f'Error creating contract: {str(e)}', 'danger')
 
-    customers = Customer.query.all()
-    services = Service.query.filter_by(is_active=True).all()
-    return render_template('contract_form.html', customers=customers, services=services)
+    clients = Customer.query.all()
+    services = Service.query.all()
+    return render_template('contract_form.html', customers=clients, services=services)
 
-@app.route('/contracts/view/<int:id>')
-def view_contract(id):
-    contract = Contract.query.get_or_404(id)
-    slabs = ContractSlab.query.filter_by(contract_id=id).all()
-    # Fetch linked services manually or via relationship
-    linked_services = db.session.query(Service).join(ContractService).filter(ContractService.contract_id == id).all()
+@app.route('/contracts/edit/<int:contract_id>', methods=['GET', 'POST'])
+def edit_contract(contract_id):
+    contract = Contract.query.get_or_404(contract_id)
     
-    return render_template('contract_view.html', contract=contract, slabs=slabs, services=linked_services)
+    if request.method == 'POST':
+        try:
+            contract.contract_name = request.form['contract_name']
+            contract.customer_id = request.form['customer_id']
+            contract.po_reference = request.form['po_reference']
+            contract.total_value = float(request.form.get('total_value', 0))
+            contract.start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%d')
+            contract.end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d')
+            contract.status = request.form.get('status', 'Draft')
+            
+            service_ids = request.form.getlist('service_ids')
+            contract.services = Service.query.filter(Service.id.in_(service_ids)).all()
+            
+            db.session.commit()
+            flash('Contract updated successfully!', 'success')
+            return redirect(url_for('list_contracts'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating: {str(e)}', 'danger')
+
+    clients = Customer.query.all()
+    services = Service.query.all()
+    current_service_ids = [s.id for s in contract.services]
+    
+    return render_template('contract_form.html', contract=contract, customers=clients, services=services, selected_services=current_service_ids)
+
+@app.route('/contracts/delete/<int:contract_id>', methods=['POST'])
+def delete_contract(contract_id):
+    contract = Contract.query.get_or_404(contract_id)
+    try:
+        db.session.delete(contract)
+        db.session.commit()
+        flash('Contract deleted successfully.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting contract: {str(e)}', 'danger')
+    return redirect(url_for('list_contracts'))
 
 # ==========================================
-# 5. SERVICE MANAGEMENT ROUTES
+# PDF DOWNLOAD (Using xhtml2pdf)
 # ==========================================
+@app.route('/contracts/<int:contract_id>/download_pdf')
+def download_contract_pdf(contract_id):
+    contract = Contract.query.get_or_404(contract_id)
+    
+    # 1. Render the HTML
+    html_content = render_template('pdf_contract.html', contract=contract)
+    
+    # 2. Create a Byte Stream to hold the PDF
+    pdf_stream = io.BytesIO()
+    
+    # 3. Generate PDF using pisa (xhtml2pdf)
+    pisa_status = pisa.CreatePDF(io.BytesIO(html_content.encode("utf-8")), dest=pdf_stream)
+    
+    if pisa_status.err: # type: ignore
+        return f"Error creating PDF: {pisa_status.err}", 500 # type: ignore
+
+    # 4. Prepare Response
+    pdf_stream.seek(0)
+    response = make_response(pdf_stream.read())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename=Contract_{contract.contract_name}.pdf'
+    
+    return response
+
 # ==========================================
-# SERVICES ROUTE
+# SERVICE ROUTES
 # ==========================================
 @app.route('/services', methods=['GET', 'POST'])
 def manage_services():
     if request.method == 'POST':
         try:
-            # 1. Get data from the Modal
             s_name = request.form.get('service_name')
             s_id = request.form.get('service_id')
             s_desc = request.form.get('description')
-
-            # 2. Validation
-            if not s_name:
-                flash("Service name is required!", "danger")
-                return redirect(url_for('manage_services'))
-
-            # 3. Create the Service Object
+            
             new_service = Service(
-                service_id=s_id,
-                service_name=s_name,
-                description=s_desc,
-                is_active=True  # We set this to True by default for new ones
+                service_id=s_id, 
+                service_name=s_name, 
+                description=s_desc, 
+                is_active=True
             )
-            
-            # 4. SAVE to Database
             db.session.add(new_service)
-            db.session.commit()  # <--- This saves it permanently
-            
-            flash(f"Service '{s_name}' added successfully!", "success")
-            
+            db.session.commit()
+            flash(f"Service '{s_name}' added!", "success")
         except Exception as e:
             db.session.rollback()
-            flash(f"Error adding service: {str(e)}", "danger")
-        
+            flash(f"Error: {str(e)}", "danger")
         return redirect(url_for('manage_services'))
 
-    # GET Request: Fetch ALL services (Removed the 'is_active' filter)
-    # This ensures services never "disappear" from the list
     all_services = Service.query.order_by(Service.service_name).all()
-    
     return render_template('services.html', services=all_services)
+
+
+@app.route('/fix-db-status')
+def fix_db_status():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Modify the column to accept 'not started'
+        cursor.execute("""
+            ALTER TABLE contracts 
+            MODIFY COLUMN status ENUM('Draft', 'Active', 'On Hold', 'Completed', 'Terminated', 'not started') 
+            DEFAULT 'not started'
+        """)
+        conn.commit()
+        return "Database successfully updated! You can now use 'not started'."
+    except Exception as e:
+        return f"Error: {str(e)}"
+    finally:
+        conn.close()
+
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=8000)
