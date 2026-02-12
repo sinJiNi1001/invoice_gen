@@ -230,47 +230,46 @@ function generatePDF() {
                                 </td>
                             </tr>
                         </tbody>
-                                                <tfoot class="border-top border-dark">
-                        <tr>
-                            <td colspan="2" class="p-0 border-dark">
-                                <div class="d-flex h-100">
-                                    <div id="p_notes" class="p-2 flex-grow-1"
-                                         contenteditable="true"
-                                         style="min-height:100px;font-size:12pt;"></div>
-                                    <div style="width:1px;background:#000;"></div>
-                                    <div class="pt-2 px-2 " style="width:120px;">
-                                        <div class="mb-3">Subtotal</div>
-                                        <div>Misc</div>
-                                    </div>
+                        
+                  <tfoot class="border-top border-dark">
+                    <tr>
+                        <td colspan="2" class="p-0 border-dark">
+                            <div class="d-flex h-100">
+                                <div id="p_notes" class="p-2 flex-grow-1"
+                                    contenteditable="true"
+                                    style="min-height:100px; font-size:12pt; outline:none;"></div>
+                                <div style="width:1px; background:#000;"></div>
+                                <div class="pt-2 px-2" style="width:120px;">
+                                    <div class="mb-3">Subtotal</div>
+                                    <div>Misc</div>
                                 </div>
-                            </td>
-                            <td class="p-0 border-dark">
-                                <div class="d-flex flex-column h-100 text-end">
-                                    <div class="p-2 border-bottom border-dark"
-                                         id="p_subtotal_final"
-                                         style="min-height:50px;">0.00</div>
-                                    <div class="p-2"></div>
-                                </div>
-                            </td>
-                        </tr>
+                            </div>
+                        </td>
+                        <td class="p-0 border-dark">
+                            <div class="d-flex flex-column h-100 text-end">
+                                <div class="p-2 border-bottom border-dark" id="p_subtotal_final" 
+                                    style="min-height:50px;">0.00</div>
+                                <div class="p-2"></div> 
+                            </div>
+                        </td>
+                    </tr>
 
-                        <tr>
-                            <td colspan="2"></td>
-                                <td class="bg-light p-2" style="border:2px  min-height: 80px;">
-                                <div class="d-flex flex-column justify-content-between h-100" style="min-height: 60px;">
-                                    
-                                    <div id="p_total_final" class="text-end " style="font-size: 14pt;">
-                                        0.00
-                                    </div>
-                                    
-                                    <div class="text-start" style="font-size: 8pt; font-weight: normal; color: #000;">
-                                        Amount in <span id="p_curr">INR</span> unless specified
-                                    </div>
+                    {# --- Second Row: Bottom line restricted to the amount cell only --- #}
+                    <tr style="border-bottom: none !important;">
+                        <td colspan="2" class="border-0"></td> 
 
+                        <td class="bg-light p-2 border border-dark" style="min-height: 80px;">
+                            <div class="d-flex flex-column justify-content-between h-100" style="min-height: 60px;">
+                                <div id="p_total_final" class="text-end fw-bold" style="font-size: 14pt;">
+                                    5192.00
                                 </div>
-                            </td>
-                        </tr>
-                        </tfoot>
+                                <div class="text-start" style="font-size: 8pt; font-weight: normal; color: #000;">
+                                    Amount in <span id="p_curr">INR</span> unless specified
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </tfoot>
                     </table>
 
                     <div class="row mt-4 align-items-end">
