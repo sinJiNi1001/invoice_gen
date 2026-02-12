@@ -155,8 +155,8 @@ function generatePDF() {
                         </div>
                         <div class="col-4 text-center mt-3">
                             <h5 class="fw-bold mb-1 mt-5">TAX INVOICE</h5>
-                            <p class="text-warning small fw-bold mt-0"
-                               style="font-size: 12pt;">ORIGINAL FOR RECIPIENT</p>
+                            <p class="small fw-bold mt-0"
+                            style="font-size: 12pt; color: #E26B0A;">ORIGINAL FOR RECIPIENT</p>
                         </div>
                         <div class="col-4 text-end">
                             <h5 class="fw-bold mb-0 text-nowrap"
@@ -232,71 +232,82 @@ function generatePDF() {
                         </tbody>
                         
                   <tfoot class="border-top border-dark">
-                    <tr>
-                        <td colspan="2" class="p-0 border-dark">
-                            <div class="d-flex h-100">
-                                <div id="p_notes" class="p-2 flex-grow-1"
-                                    contenteditable="true"
-                                    style="min-height:100px; font-size:12pt; outline:none;"></div>
-                                <div style="width:1px; background:#000;"></div>
-                                <div class="pt-2 px-2" style="width:120px;">
-                                    <div class="mb-3">Subtotal</div>
-                                    <div>Misc</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="p-0 border-dark">
-                            <div class="d-flex flex-column h-100 text-end">
-                                <div class="p-2 border-bottom border-dark" id="p_subtotal_final" 
-                                    style="min-height:50px;">0.00</div>
-                                <div class="p-2"></div> 
-                            </div>
-                        </td>
-                    </tr>
+    <tr>
+        <td colspan="2" class="p-0" style="border: 1px solid #000 !important;">
+    <div class="d-flex h-100">
+        <div id="p_notes" class="p-2 flex-grow-1"
+            contenteditable="true"
+            style="min-height:100px; font-size:12pt; outline:none;">
+        </div>
+        
+        <div style="width:1px; background:#000;"></div>
+        
+        <div class="pt-2 px-2" style="width:120px; font-weight: bold;">
+            <div class="mb-3">Subtotal</div>
+            <div>Misc</div>
+        </div>
+    </div>
+</td>
+        <td class="p-0 border-dark">
+            <div class="d-flex flex-column h-100 text-end">
+                <div class="p-2 border-bottom border-dark" id="p_subtotal_final" 
+                    style="min-height:50px;">0.00</div>
+                <div class="p-2"></div> 
+            </div>
+        </td>
+    </tr>
 
-                    {# --- Second Row: Bottom line restricted to the amount cell only --- #}
-                    <tr style="border-bottom: none !important;">
-                        <td colspan="2" class="border-0"></td> 
+    <tr style="border-bottom: none !important;">
+        <td colspan="2" class="border-0"></td> 
+        <td class="bg-light p-2 border border-dark" style="min-height: 80px;">
+            <div class="d-flex flex-column justify-content-between h-100" style="min-height: 60px;">
+                <div id="p_total_final" class="text-end fw-bold" style="font-size: 14pt;">
+                    0.00
+                </div>
+                <div class="text-start" style="font-size: 8pt; font-weight: normal; color: #000;">
+                    Amount in <span id="p_curr">INR</span> unless specified
+                </div>
+            </div>
+        </td>
+    </tr>
+</tfoot>
+</table>
 
-                        <td class="bg-light p-2 border border-dark" style="min-height: 80px;">
-                            <div class="d-flex flex-column justify-content-between h-100" style="min-height: 60px;">
-                                <div id="p_total_final" class="text-end fw-bold" style="font-size: 14pt;">
-                                    5192.00
-                                </div>
-                                <div class="text-start" style="font-size: 8pt; font-weight: normal; color: #000;">
-                                    Amount in <span id="p_curr">INR</span> unless specified
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                </tfoot>
-                    </table>
-
-                    <div class="row mt-4 align-items-end">
-                        <div class="col-3 text-center">
-                            <img src="{{ url_for('static', filename='stamp.png') }}"
-                                 style="max-height:80px;">
-                            <p class="fw-bold mb-0">Prashant Phatak</p>
-                            <p class="m-0" style="font-size:9pt;">Founder, Director</p>
-                        </div>
-                        <div class="col-9">
-                            <div class="ps-3 border-start border-dark"
-                                 style="font-size:10pt;line-height:1.4;">
-                                <p class="fw-bold mb-1">
-                                    Cheques Payable : Valency Networks Pvt. Ltd.
-                                </p>
-                                <b>Bank name :</b> IDBI, Ganeshnagar (Erandawane), Pune, India 411004<br>
-                                <b>Account number :</b> 0588102000014234<br>
-                                <b>IFSC Code :</b> IBKL0000588 |
-                                <b>Swift Code :</b> IBKLINBB007<br>
-                                Address : 401 Ekdanta, Mehendale Garage Road,
-                                Erandawane, Pune 411004, India<br>
-                                Web : https://www.valencynetworks.com
-                                &nbsp;&nbsp;Email : prashant@valencynetworks.com
-                            </div>
-                        </div>
-                    </div>
-
+<div class="row align-items-end" style="margin-top: -60px; position: relative; z-index: 10;"> 
+    <div class="col-3 text-center" style="position: relative;">
+        <img src="{{ url_for('static', filename='stamp.png') }}"
+            style="max-height: 100px; 
+                    position: absolute; 
+                    top: -60px; 
+                    left: 50%; 
+                    transform: translateX(-50%) rotate(-5deg); 
+                    z-index: 100; 
+                    pointer-events: none;
+                    opacity: 0.85;">
+        
+        <div style="margin-top: 40px; position: relative; z-index: 5;">
+            <p class="fw-bold mb-0" style="font-size: 11pt;">Prashant Phatak</p>
+            <p class="fw-bold m-0" style="font-size: 11pt;">Founder, Director</p>
+        </div>
+    </div>
+    <div class="col-9">
+        <div class="ps-3  border-dark"
+             style="font-size:10pt; background: transparent; line-height: 1.6;">
+            <p class="fw-bold mb-1">
+                Cheques Payable : Valency Networks Pvt. Ltd.
+            </p>
+            <b class="mb-1">Bank name :</b> IDBI, Ganeshnagar (Erandawane), Pune, India 411004<br>
+            <b class="mb-1">Account number :</b> 0588102000014234<br>
+            <b class="mb-1">IFSC Code :</b> IBKL0000588 &nbsp;
+            <b class="mb-1">MICR Code :</b> 411259025 &nbsp;
+            <b class="mb-1">Swift Code :</b> IBKLINBB007<br>
+            Address : 401 Ekdanta, Mehendale Garage Road,
+            Erandawane, Pune 411004, India<br>
+            Web : https://www.valencynetworks.com
+            &nbsp;&nbsp;&nbsp;Email : prashant@valencynetworks.com
+        </div>
+    </div>
+</div>
                 </div>
             </div>
 
@@ -312,4 +323,3 @@ function generatePDF() {
         </div>
     </div>
 </div>
-
