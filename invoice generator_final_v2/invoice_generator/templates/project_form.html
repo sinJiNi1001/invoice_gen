@@ -1,317 +1,89 @@
 {% extends "base.html" %}
-
 {% block content %}
-<div class="container" style="max-width: 900px;" style="font-family: 'Calibri', sans-serif;">
-    <form method="POST" action="{{ url_for('edit_project', id=project.id) if project else url_for('create_project') }}" id="projectForm">
-        
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-white">
-                <h4 class="mb-0">{{ 'Edit' if project else 'Create' }} Project</h4>
-            </div>
-            <div class="card-body">
-                <div class="row g-3 mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label fw-bold">Project Name <span class="text-danger">*</span></label>
-                        <input type="text" name="project_name" class="form-control" required value="{{ project.project_name if project else '' }}">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label fw-bold">PO Number/Refrence</label>
-                        <input type="text" name="po_number" class="form-control" placeholder="Enter PO Number..." value="{{ project.po_number if project else '' }}">
-                    </div>
+<div class="container mt-4" style="font-family: 'Calibri', sans-serif;">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">{{ 'Edit Project' if project else 'New Project' }}</h4>
+                    <a href="{{ url_for('list_projects') }}" class="btn btn-sm btn-light">Back</a>
                 </div>
-
-                <div class="row g-3 mb-4">
-                    <div class="col-md-6">
-                        <label class="form-label fw-bold">Customer <span class="text-danger">*</span></label>
-                        <select name="customer_id" id="customer_select" class="form-select" required onchange="updateProjectCurrency()">
-                            <option value="" data-currency="INR">Select Customer...</option>
-                            {% for c in customers %}
-                            <option value="{{ c.id }}" 
-                            data-currency="{{ c.currency }}"
-                            {% if project and project.customer_id == c.id %}selected{% endif %}>
-                            {{ c.company_name }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label fw-bold">Start Date</label>
-                        <input type="date" name="start_date" id="start_date" class="form-control" value="{{ project.start_date if project else '' }}">
-                    </div>
-                </div>
-
-                <div class="row g-3 mb-4">
-                    <div class="col-12">
-                        <label class="form-label fw-bold">Select Services <span class="text-danger">*</span></label>
+                <div class="card-body">
+                    <form method="post">
                         
                         <div class="mb-3">
-                            <select id="serviceSelector" class="form-select border-primary" onchange="addServiceFromDropdown()">
-                                <option value="">-- Click to search/add a service --</option>
-                                {% for s in services %}
-                                    <option value="{{ s.service_name }}">{{ s.service_name }}</option>
-                                {% endfor %}
-                            </select>
+                            <label class="form-label">Project Name *</label>
+                            <input type="text" name="project_name" class="form-control" value="{{ project.project_name if project else '' }}" required>
                         </div>
 
-                        <div class="table-responsive border rounded bg-white">
-                            <table class="table table-sm align-middle mb-0" id="servicesTable">
-                                <thead class="table-light">
-                                    <tr class="small">
-                                        <th width="50px" class="text-center">Action</th>
-                                        <th>Service Name</th>
-                                        <th width="250px">Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="servicesTableBody">
-                                    {% if project and breakdown_dict %}
-                                        {% for name, cost in breakdown_dict.items() %}
-                                        <tr>
-                                            <td class="text-center">
-                                                <button type="button" class="btn btn-sm btn-link text-danger" onclick="removeServiceRow(this)">
-                                                    <i class="fa-solid fa-circle-minus"></i>
-                                                </button>
-                                                <input type="hidden" name="service_names[]" value="{{ name }}">
-                                            </td>
-                                            <td class="small fw-bold text-primary">{{ name }}</td>
-                                            <td>
-                                                <div class="input-group input-group-sm">
-                                                    <span class="input-group-text bg-light border-0 currency-label">{{ project.currency }}</span>
-                                                    <input type="number" step="0.01" name="service_costs[]" class="form-control service-amount-input" 
-                                                           value="{{ cost }}" oninput="updateProjectTotal()" required>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    {% endif %}
-                                </tbody>
-                            </table>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Customer *</label>
+                                <select name="customer_id" class="form-select" required>
+                                    <option value="">Select Customer</option>
+                                    {% for c in customers %}
+                                    <option value="{{ c.id }}" {% if project and project.customer_id == c.id %}selected{% endif %}>
+                                        {{ c.company_name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">PO Number / Code</label>
+                                <input type="text" name="po_number" class="form-control" value="{{ project.po_number if project else '' }}">
+                            </div>
                         </div>
-                        <input type="hidden" name="service_type" id="hidden_service_type" value="{{ project.service_type if project else '' }}">
-                    </div>
-                </div>
 
-                <div class="row g-3 mb-3">
-                    <div class="col-md-4">
-                        <label class="form-label fw-bold text-primary">Project Total Value</label>
-                        <input type="number" step="0.01" name="total_value" id="total_value" class="form-control fw-bold border-primary bg-light" readonly required value="{{ project.total_value if project else '' }}">
-                    </div>
-                    <div class="col-md-4">
-                       <label class="form-label fw-bold">Currency</label>
-                        <input type="text" id="project_currency" class="form-control bg-light" value="{{ project.currency if project else 'INR' }}" readonly>
-                        <input type="hidden" name="currency" id="hidden_currency" value="{{ project.currency if project else 'INR' }}">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label fw-bold">Status</label>
-                        <select name="status" class="form-select">
-                            <option value="Active" {% if project and project.status == 'Active' %}selected{% endif %}>Active</option>
-                            <option value="Completed" {% if project and project.status == 'Completed' %}selected{% endif %}>Completed</option>
-                            <option value="On Hold" {% if project and project.status == 'On Hold' %}selected{% endif %}>On Hold</option>
-                            <option value="Cancelled" {% if project and project.status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
-                        </select>
-                    </div>
-                </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Total Value</label>
+                                <input type="number" step="0.01" name="total_value" class="form-control" value="{{ project.total_value if project else '' }}">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Currency</label>
+                                <select name="currency" class="form-select">
+                                    <option value="INR" {% if not project or project.currency == 'INR' %}selected{% endif %}>INR</option>
+                                    <option value="USD" {% if project and project.currency == 'USD' %}selected{% endif %}>USD</option>
+                                    <option value="EUR" {% if project and project.currency == 'EUR' %}selected{% endif %}>EUR</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Payment Type</label>
+                                <select name="payment_type" class="form-select">
+                                    <option value="Milestone" {% if not project or project.payment_type == 'Milestone' %}selected{% endif %}>Milestone</option>
+                                    <option value="Monthly" {% if project and project.payment_type == 'Monthly' %}selected{% endif %}>Monthly</option>
+                                    <option value="One-time" {% if project and project.payment_type == 'One-time' %}selected{% endif %}>One-time</option>
+                                </select>
+                            </div>
+                        </div>
 
-                <div class="row g-3 mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label fw-bold">Payment Structure</label>
-                        <select name="payment_type" id="payment_type" class="form-select" onchange="toggleSlabSection()">
-                            <option value="Full Payment" {% if project and project.payment_type == 'Full Payment' %}selected{% endif %}>Full Payment (100%)</option>
-                            <option value="Milestone-based" {% if project and project.payment_type == 'Milestone-based' %}selected{% endif %}>Milestone-based</option>
-                        </select>
-                    </div>
-                </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Start Date</label>
+                                <input type="date" name="start_date" class="form-control" value="{{ project.start_date if project else today }}">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Status</label>
+                                <select name="status" class="form-select">
+                                    <option value="Active" {% if not project or project.status == 'Active' %}selected{% endif %}>Active</option>
+                                    <option value="Completed" {% if project and project.status == 'Completed' %}selected{% endif %}>Completed</option>
+                                    <option value="On Hold" {% if project and project.status == 'On Hold' %}selected{% endif %}>On Hold</option>
+                                </select>
+                            </div>
+                        </div>
 
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Project Description</label>
-                    <textarea name="description" class="form-control" rows="2">{{ project.description if project else '' }}</textarea>
-                </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea name="description" class="form-control" rows="3">{{ project.description if project else '' }}</textarea>
+                        </div>
 
-                <div id="slab_section" style="display: none;" class="mt-4 p-3 bg-light rounded border">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h6 class="mb-0 fw-bold">Payment Slab Configuration</h6>
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addSlabRow()">+ Add Slab</button>
-                    </div>
-                    <table class="table table-sm bg-white">
-                        <thead>
-                            <tr class="small text-muted">
-                                <th>Slab Name</th>
-                                <th width="15%">Percent (%)</th>
-                                <th width="20%">Amount</th>
-                                <th width="25%">Due Condition</th>
-                                <th width="5%"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="slabBody"></tbody>
-                    </table>
-                    <div id="validationMsg" class="small text-danger fw-bold"></div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">Save Project</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
-
-        <div class="d-flex justify-content-end mb-5">
-            <a href="{{ url_for('list_projects') }}" class="btn btn-light border me-2">Cancel</a>
-            <button type="submit" class="btn btn-primary px-4" id="saveBtn">Save Project</button>
-        </div>
-    </form>
+    </div>
 </div>
-
-<script>
-// --- UPDATED SERVICE LOGIC ---
-function addServiceFromDropdown() {
-    const selector = document.getElementById('serviceSelector');
-    const serviceName = selector.value;
-    const currency = document.getElementById('project_currency').value || 'INR';
-
-    if (!serviceName) return;
-
-    // Prevent duplicates
-    const existing = document.querySelectorAll('input[name="service_names[]"]');
-    for (let input of existing) {
-        if (input.value === serviceName) {
-            selector.value = "";
-            return;
-        }
-    }
-
-    const tbody = document.getElementById('servicesTableBody');
-    const row = document.createElement('tr');
-    row.innerHTML = `
-        <td class="text-center">
-            <button type="button" class="btn btn-sm btn-link text-danger" onclick="removeServiceRow(this)">
-                <i class="fa-solid fa-circle-minus"></i>
-            </button>
-            <input type="hidden" name="service_names[]" value="${serviceName}">
-        </td>
-        <td class="small fw-bold text-primary">${serviceName}</td>
-        <td>
-            <div class="input-group input-group-sm">
-                <span class="input-group-text bg-light border-0 currency-label">${currency}</span>
-                <input type="number" step="0.01" name="service_costs[]" class="form-control service-amount-input" 
-                       placeholder="0.00" oninput="updateProjectTotal()" required>
-            </div>
-        </td>
-    `;
-    tbody.appendChild(row);
-    selector.value = "";
-    updateProjectTotal();
-}
-
-function removeServiceRow(btn) {
-    btn.closest('tr').remove();
-    updateProjectTotal();
-}
-
-function updateProjectTotal() {
-    let grandTotal = 0;
-    let selectedServices = [];
-
-    const names = document.querySelectorAll('input[name="service_names[]"]');
-    const costs = document.querySelectorAll('.service-amount-input');
-
-    costs.forEach((input, index) => {
-        const val = parseFloat(input.value) || 0;
-        grandTotal += val;
-        selectedServices.push(names[index].value);
-    });
-
-    document.getElementById('total_value').value = grandTotal.toFixed(2);
-    document.getElementById('hidden_service_type').value = selectedServices.join(', ');
-
-    calculateSlabs();
-}
-
-// --- REMAINING LOGIC (KEEPING AS IS) ---
-function toggleSlabSection() {
-    const type = document.getElementById('payment_type').value;
-    const section = document.getElementById('slab_section');
-    section.style.display = (type === 'Milestone-based') ? 'block' : 'none';
-    
-    if(type === 'Milestone-based' && document.getElementById('slabBody').children.length === 0) {
-        addSlabRow();
-    }
-    validateTotal();
-}
-
-// Update the function signature to accept 'cond' properly
-function addSlabRow(name='', percent='', cond='') { 
-    const tbody = document.getElementById('slabBody');
-    const row = document.createElement('tr');
-    row.innerHTML = `
-        <td><input type="text" name="slab_names[]" class="form-control form-control-sm" value="${name}" required placeholder="e.g. Advance"></td>
-        <td><input type="number" step="0.01" name="slab_percentages[]" class="form-control form-control-sm perc-input" value="${percent}" required oninput="calculateSlabs()"></td>
-        <td><input type="text" class="form-control form-control-sm amt-display" readonly></td>
-        <td>
-            <input type="text" name="due_conditions[]" class="form-control form-control-sm" value="${cond}" placeholder="e.g. After UAT">
-        </td>
-        <td><button type="button" class="btn btn-link text-danger p-0" onclick="this.closest('tr').remove(); validateTotal();"><i class="fa-solid fa-trash"></i></button></td>
-    `;
-    tbody.appendChild(row);
-    calculateSlabs();
-}
-
-function calculateSlabs() {
-    const totalVal = parseFloat(document.getElementById('total_value').value) || 0;
-    const percs = document.querySelectorAll('.perc-input');
-    const amts = document.querySelectorAll('.amt-display');
-    
-    percs.forEach((input, index) => {
-        const p = parseFloat(input.value) || 0;
-        amts[index].value = ((p / 100) * totalVal).toFixed(2);
-    });
-    validateTotal();
-}
-
-function validateTotal() {
-    const type = document.getElementById('payment_type').value;
-    const saveBtn = document.getElementById('saveBtn');
-    const msg = document.getElementById('validationMsg');
-    
-    if (type === 'Milestone-based') {
-        let totalPercent = 0;
-        document.querySelectorAll('.perc-input').forEach(input => {
-            totalPercent += parseFloat(input.value) || 0;
-        });
-
-        if (totalPercent !== 100) {
-            msg.innerText = `Total Percentage must be 100% (Current: ${totalPercent}%)`;
-            saveBtn.disabled = true;
-        } else {
-            msg.innerText = "";
-            saveBtn.disabled = false;
-        }
-    } else {
-        msg.innerText = "";
-        saveBtn.disabled = false;
-    }
-}
-
-function updateProjectCurrency() {
-    const customerSelect = document.getElementById('customer_select');
-    const currencyInput = document.getElementById('project_currency');
-    const selectedOption = customerSelect.options[customerSelect.selectedIndex];
-    const currency = selectedOption.getAttribute('data-currency') || 'INR';
-    
-    currencyInput.value = currency;
-    document.getElementById('hidden_currency').value = currency;
-
-    document.querySelectorAll('.currency-label').forEach(span => {
-        span.innerText = currency;
-    });
-}
-
-window.onload = function() {
-    {% if project and slabs %}
-        // Clear the auto-generated row if we are loading existing ones
-        document.getElementById('slabBody').innerHTML = '';
-        {% for s in slabs %}
-            // Pass the condition from the database to the function
-            addSlabRow("{{ s.slab_name }}", "{{ s.percentage }}", "{{ s.due_condition }}");
-        {% endfor %}
-    {% endif %}
-
-    updateProjectCurrency();
-    toggleSlabSection();
-    updateProjectTotal();
-};
-</script>
 {% endblock %}

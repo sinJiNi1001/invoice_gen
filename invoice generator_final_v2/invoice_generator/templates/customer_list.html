@@ -50,7 +50,7 @@
         <div class="col-md-2">
             <select name="year" class="form-select" onchange="this.form.submit()">
                 <option value="">Year</option>
-                {% for y in range(2000, 2031) %}
+                {% for y in range(2026,2000,-1) %}
                 <option value="{{ y }}" {% if filter_year == y|string %}selected{% endif %}>{{ y }}</option>
                 {% endfor %}
             </select>
@@ -58,8 +58,8 @@
 
         <div class="col-md-2">
             <select name="sort_by" class="form-select" onchange="this.form.submit()">
-                <option value="newest" {% if sort_by == 'newest' %}selected{% endif %}>Newest Joined</option>
-                <option value="oldest" {% if sort_by == 'oldest' %}selected{% endif %}>Oldest Joined</option>
+                <option value="newest" {% if sort_by == 'newest' %}selected{% endif %}>Newest Created</option>
+                <option value="oldest" {% if sort_by == 'oldest' %}selected{% endif %}>Oldest Created</option>
                 <option value="name_asc" {% if sort_by == 'name_asc' %}selected{% endif %}>Name (A-Z)</option>
             </select>
         </div>
