@@ -29,6 +29,17 @@
 }
 
 @media print {
+    /* Force the black divider lines to show in PDF/Print */
+    div[style*="background:#000"], 
+    div[style*="background: #000"] {
+        background-color: #000 !important;
+        border-right: 1px solid #000 !important; /* Extra insurance for PDF engines */
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}
+
+@media print {
     body {
         margin: 0;
         padding: 0;
@@ -196,21 +207,30 @@ function generatePDF() {
                                 <th style="width:18%;">AMOUNT</th>
                             </tr>
                         </thead>
-                        <tbody>
-                        <tr>
-                            <td class="text-center align-top pt-3">1</td>
-                            <td class="align-top pt-3">
-                                <div id="p_description" contenteditable="true"
-                                     style="outline:none;line-height:1.6;min-height:400px;"></div>
-                            </td>
-                            <td id="p_amount_col"
-                                class="text-end align-top pt-3 "
-                                contenteditable="true"
-                                style="outline:none;line-height:1.6;"></td>
-                        </tr>
-                        </tbody>
+                       <tbody>
+                            <tr>
+                                <td class="text-center align-top pt-3">1</td>
+                                <td class="align-top p-0 position-relative">
+                                    <div class="d-flex" style="min-height: 500px;">
+                                        <div id="p_description" contenteditable="true"
+                                            class="p-3 flex-grow-1"
+                                            style="outline:none; line-height:1.10;">
+                                        </div>
 
-                        <tfoot class="border-top border-dark">
+                                        <div style="width:1px; background:#000;"></div>
+
+                                        <div style="width:120px;" class="bg-white d-flex flex-column justify-content-end p-2 text-start">
+                                            </div>
+                                    </div>
+                                </td>
+                                <td id="p_amount_col"
+                                    class="text-end align-top pt-3"
+                                    contenteditable="true"
+                                    style="outline:none;line-height:1.6;">
+                                </td>
+                            </tr>
+                        </tbody>
+                                                <tfoot class="border-top border-dark">
                         <tr>
                             <td colspan="2" class="p-0 border-dark">
                                 <div class="d-flex h-100">
