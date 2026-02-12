@@ -260,6 +260,20 @@ function fetchProjectData(select) {
     calculateGrandTotal();
 }
 
+function handleSlabSelection() {
+    let selectedTotal = 0;
+    let selectedNames = [];
+    const checkboxes = document.querySelectorAll('.slab-checkbox:checked');
+
+    checkboxes.forEach(cb => {
+        selectedTotal += parseFloat(cb.dataset.amount) || 0;
+        selectedNames.push(cb.dataset.name);
+    });
+    document.getElementById('subtotal_val').value = selectedTotal.toFixed(2);
+
+    document.getElementById('linked_slab_name').value = selectedNames.join(", ");
+    calculateGrandTotal();
+}
 
 // 3. AUTO TAX TYPE FETCHING
 $(document).ready(function() {
@@ -334,6 +348,29 @@ function calculateGrandTotal() {
     }
 }
 
+function calculateGrandTotal() {
+    const subtotal = parseFloat(document.getElementById('subtotal_val').value) || 0;
+    const taxType = document.getElementById('tax_type').value; // Reads 'GST', 'IGST', or 'NONE'
+    
+    let taxPercent = 0;
+    if (taxType === "GST" || taxType === "IGST") {
+        taxPercent = 0.18; // 18% Total Tax
+    }
+
+    const taxAmount = subtotal * taxPercent;
+    const grandTotal = subtotal + taxAmount;
+
+    // Update the input fields
+    document.getElementById('tax_amount_input').value = taxAmount.toFixed(2);
+    document.getElementById('grand_total_input').value = grandTotal.toFixed(2);
+    
+    // Update the UI Label
+    const taxLabel = document.getElementById('tax_label_ui');
+    if (taxLabel) {
+        taxLabel.innerText = (taxType === "GST") ? "Tax (CGST+SGST 18%)" : 
+                             (taxType === "IGST" ? "Tax (IGST 18%)" : "Tax (0%)");
+    }
+}
 
 function updatePrintPreview() {
     const projSelect = document.getElementById('projectFetchSelector');
@@ -349,9 +386,7 @@ function updatePrintPreview() {
     
     const addrElem = document.getElementById('p_customer_address');
     addrElem.innerText = (custOpt ? custOpt.dataset.address : "") || "---";
-    addrElem.style.maxWidth = "300px"; 
-    addrElem.style.whiteSpace = "normal"; 
-    
+
     document.getElementById('p_customer_gst').innerText = (custOpt ? custOpt.dataset.gstNumber : "") || "N/A";
     document.getElementById('p_curr').innerText = (custOpt ? custOpt.dataset.currency : "") || "INR";
 
@@ -365,18 +400,24 @@ function updatePrintPreview() {
     const isMilestone = slabSect && slabSect.style.display === 'block';
     const selectedSlabs = document.querySelectorAll('.slab-checkbox:checked');
 
+    // Helper function to keep lines in sync
+    // Standardizing line-height in styles is key
+    const addLine = (desc, amt = "") => {
+        descHTML += `<div style="height: 1.6em; overflow: hidden;">${desc}</div>`;
+        amtHTML += `<div style="height: 1.6em; text-align: right;">${amt}</div>`;
+    };
+
     // 3. SERVICE NAMES AND AMOUNTS
     if (projOpt && projOpt.dataset.breakdown) {
         try {
             const breakdown = JSON.parse(projOpt.dataset.breakdown);
             for (const [name, cost] of Object.entries(breakdown)) {
-                descHTML += `<b style="font-size: 11pt;">${name}</b><br>`;
                 if (!isMilestone) {
                     let val = parseFloat(cost) || 0;
-                    amtHTML += `${val.toFixed(2)}<br>`;
+                    addLine(`<b style="font-size: 11pt;">${name}</b>`, val.toFixed(2));
                     baseTotal += val;
                 } else {
-                    amtHTML += `<br>`; 
+                    addLine(`<b style="font-size: 11pt;">${name}</b>`, ""); 
                 }
             }
         } catch (e) { console.error(e); }
@@ -385,62 +426,44 @@ function updatePrintPreview() {
     // 4. Milestone / Slab Logic
     if (isMilestone && selectedSlabs.length > 0) {
         selectedSlabs.forEach(cb => {
-            descHTML += `<span>${cb.dataset.name}</span><br>`;
             let val = parseFloat(cb.dataset.amount) || 0;
-            amtHTML += `${val.toFixed(2)}<br>`;
+            addLine(`<span>${cb.dataset.name}</span>`, val.toFixed(2));
             baseTotal += val;
         });
     }
 
     // 5. PO Reference
-    descHTML += `Ref :: as per Purchase order No.: ${poNumber}<br>`;
-    amtHTML += `<br>`; 
+    addLine(`Ref :: as per Purchase order No.: ${poNumber}`, "");
+    addLine("&nbsp;", ""); // Spacer line
 
     // 6. TAX LOGIC
     const taxType = document.getElementById('tax_type').value;
-    let totalTaxAmt = 0; // Calculated tax to be added to the total
-
-    descHTML += `<br>`;
-    amtHTML += `<br>`;
+    let totalTaxAmt = 0;
 
     if (taxType === 'NONE') {
         const disclaimer = (custOpt ? custOpt.dataset.disclaimer : "") || "";
         if (disclaimer) {
-            descHTML += `<div style=" margin-bottom: 5px; font-size: 12pt;">${disclaimer}</div>`;
-            amtHTML += `<br>`;
+            addLine(`<div style="font-size: 12pt;">${disclaimer}</div>`, "");
         }
     }
 
-    descHTML += `Central GST [CGST] - 9%<br>`;
-    descHTML += `State GST [SGST] - 9%<br>`;
-    descHTML += `Integrated GST [IGST] - 18%`;
+    // Tax Rows - ALWAYS SYNCED
+    let cgstVal = (taxType === 'GST') ? (baseTotal * 0.09) : 0;
+    let sgstVal = (taxType === 'GST') ? (baseTotal * 0.09) : 0;
+    let igstVal = (taxType === 'IGST') ? (baseTotal * 0.18) : 0;
+    totalTaxAmt = cgstVal + sgstVal + igstVal;
 
-    if (taxType === 'GST') {
-        let cgst = baseTotal * 0.09;
-        let sgst = baseTotal * 0.09;
-        totalTaxAmt = cgst + sgst;
-        amtHTML += `${cgst.toFixed(2)}<br>${sgst.toFixed(2)}<br>0.00`;
-    } else if (taxType === 'IGST') {
-        totalTaxAmt = baseTotal * 0.18;
-        amtHTML += `0.00<br>0.00<br>${totalTaxAmt.toFixed(2)}`;
-    } else {
-        totalTaxAmt = 0;
-        amtHTML += `0.00<br>0.00<br>0.00`;
-    }
+    addLine(`Central GST [CGST] - 9%`, cgstVal > 0 ? cgstVal.toFixed(2) : "0.00");
+    addLine(`State GST [SGST] - 9%`, sgstVal > 0 ? sgstVal.toFixed(2) : "0.00");
+    addLine(`Integrated GST [IGST] - 18%`, igstVal > 0 ? igstVal.toFixed(2) : "0.00");
 
-    // --- KEY CHANGE: Calculate Inclusive Total ---
+    // 7. Final Totals
     const inclusiveTotal = (baseTotal + totalTaxAmt).toFixed(2);
-
     document.getElementById('p_description').innerHTML = descHTML;
     document.getElementById('p_amount_col').innerHTML = amtHTML;
     
-    // --- KEY CHANGE: Set both     footer values to the inclusive total ---
-    if(document.getElementById('p_subtotal_final')) {
-        document.getElementById('p_subtotal_final').innerText = inclusiveTotal;
-    }
-    if(document.getElementById('p_total_final')) {
-        document.getElementById('p_total_final').innerText = inclusiveTotal;
-    }
+    if(document.getElementById('p_subtotal_final')) document.getElementById('p_subtotal_final').innerText = inclusiveTotal;
+    if(document.getElementById('p_total_final')) document.getElementById('p_total_final').innerText = inclusiveTotal;
 }
 
 window.onload = () => {
