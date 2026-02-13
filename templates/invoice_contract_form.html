@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4" style="font-family: 'Calibri', sans-serif; max-width: 950px;">
+    <form action="{{ url_for('contract_invoice', id=invoice.id if invoice else None) }}" method="POST" id="contractInvoiceForm">
+        <input type="hidden" name="linked_slab_name" id="linked_slab_name" value="{{ invoice.slab_name if invoice else '' }}">
+        <input type="hidden" name="total_amount" id="final_total_hidden">
+
+        <div class="card shadow-sm mb-4 border-0">
+            <div class="card-header bg-white py-3 border-bottom">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <h4 class="mb-0 text-primary">{{ 'Edit' if invoice else 'Create' }} Contract Invoice</h4>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-body">
+                <div class="row g-3 mb-4 p-3 rounded border border-primary bg-light shadow-sm">
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold text-primary"><i class="fa-solid fa-file-contract me-2"></i>1. Search & Select Contract</label>
+                        <select name="contract_id" id="contract_select" class="form-select border-primary fw-bold" required>
+                            <option value="">-- Start by typing contract name --</option>
+                            {% for c in contracts %}
+                            <option value="{{ c.id }}" 
+                                    data-customer-id="{{ c.customer_id }}" 
+                                    data-service-id="{{ c.primary_service_id }}"
+                                    data-slabs='{{ c.slabs_list_json | safe }}' 
+                                    {% if invoice and invoice.contract_id == c.id %}selected{% endif %}>
+                                {{ c.contract_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold text-uppercase text-muted">Customer (Auto-mapped)</label>
+                        <input type="text" id="customer_display" class="form-control form-control-sm bg-light fw-bold" readonly placeholder="Select contract first...">
+                        <input type="hidden" name="customer_id" id="customer_id_hidden">
+                        
+                        <div id="customer_lookup" style="display:none;">
+                            {% for c in customers %}
+                            <span id="cust_ref_{{ c.id }}" 
+                                  data-cname="{{ c.company_name }}"
+                                  data-address="{{ c.address }}"
+                                  data-city="{{ c.city or '' }}"
+                                  data-state="{{ c.state or '' }}"
+                                  data-pincode="{{ c.pincode or '' }}"
+                                  data-country="{{ c.country or '' }}"
+                                  data-gst-number="{{ c.gst_number }}"
+                                  data-gst-type="{{ c.gst_type }}"
+                                  data-currency="{{ c.currency or 'INR' }}"
+                                  data-disclaimer="{{ c.tax_disclaimer or '' }}"></span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-uppercase text-muted">Invoice Number</label>
+                        <input type="text" name="invoice_number" class="form-control form-control-sm bg-light" value="{{ invoice.invoice_number if invoice else suggested_no }}" readonly>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-uppercase text-muted">Invoice Date</label>
+                        <input type="date" name="invoice_date" class="form-control form-control-sm" value="{{ invoice.invoice_date.strftime('%Y-%m-%d') if invoice else now.strftime('%Y-%m-%d') }}" required>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-8">
+                        <label class="form-label small fw-bold">Select Milestone (Slab)</label>
+                        <select name="slab_select_input" id="slab_select" class="form-select form-select-sm border-primary">
+                            <option value="">-- Choose Milestone --</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold">Tax Type</label>
+                        <input type="text" id="tax_type_display" class="form-control form-control-sm bg-light fw-bold" readonly>
+                        <input type="hidden" name="tax_type" id="tax_type_hidden">
+                    </div>
+                </div>
+
+                <div id="service_rows">
+                    <div class="row g-2 mb-2 align-items-end service-row">
+                        <div class="col-md-7">
+                            <label class="extra-small text-muted">Service Description</label>
+                            <input type="text" id="service_display" class="form-control form-control-sm bg-light fw-bold" readonly>
+                            <input type="hidden" name="service_ids[]" id="main_service_id">
+                            
+                            <div id="service_lookup" style="display:none;">
+                                {% for s in services %}
+                                <span id="serv_ref_{{ s.id }}" data-sname="{{ s.service_name }}"></span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="extra-small text-muted">Base Amount</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">₹</span>
+                                <input type="number" step="0.01" name="amounts[]" class="form-control line-amount fw-bold" placeholder="0.00">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <div class="row align-items-center bg-light rounded p-3 text-center border">
+                    <div class="col-md-4">
+                        <span class="small fw-bold d-block text-muted text-uppercase">Subtotal</span>
+                        <h5 class="fw-bold mb-0">₹ <span id="display_subtotal">0.00</span></h5>
+                    </div>
+                    <div class="col-md-4 border-start">
+                        <span class="small fw-bold d-block text-muted text-uppercase" id="tax_label_ui">Tax</span>
+                        <h5 class="fw-bold mb-0">₹ <span id="display_tax">0.00</span></h5>
+                    </div>
+                    <div class="col-md-4 border-start">
+                        <span class="small fw-bold d-block text-primary text-uppercase">Grand Total</span>
+                        <h4 class="text-primary fw-bold mb-0">₹ <span id="display_total">0.00</span></h4>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card-footer bg-white py-3 d-flex justify-content-between align-items-center">
+                <div>
+                    <a href="{{ url_for('edit_list') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fa-solid fa-arrow-left me-1"></i> Back to Registry
+                    </a>
+                </div>
+                <div>
+                    <button type="button" class="btn btn-outline-info me-2" onclick="updatePrintPreview()" data-bs-toggle="modal" data-bs-target="#previewModal">
+                        <i class="fa-solid fa-eye me-1"></i> Print Preview
+                    </button>
+                    <button type="submit" class="btn btn-primary px-5 fw-bold">
+                        <i class="fa-solid fa-save me-1"></i> Save Invoice
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    $('#contract_select').select2({
+        placeholder: "-- Start by typing contract name --",
+        allowClear: true,
+        width: '100%'
+    });
+
+    const contractSelect = document.getElementById('contract_select');
+    const slabSelect = document.getElementById('slab_select');
+    const serviceRows = document.getElementById('service_rows');
+    const savedSlabName = document.getElementById('linked_slab_name').value;
+
+    // Handle Select2 Change
+    $('#contract_select').on('change', function() {
+        const opt = this.options[this.selectedIndex];
+        slabSelect.innerHTML = '<option value="">-- Choose Milestone --</option>';
+        
+        if (opt && opt.value) {
+            // 1. Map Customer
+            const custId = opt.dataset.customerId;
+            const custRef = document.getElementById('cust_ref_' + custId);
+            if (custRef) {
+                document.getElementById('customer_id_hidden').value = custId;
+                document.getElementById('customer_display').value = custRef.dataset.cname;
+                
+                // 2. Map Tax Type (REFINED CHECK)
+                const gstType = (custRef.dataset.gstType || "").toUpperCase().trim();
+                let taxTypeVal = "GST";
+
+                if (gstType === "IGST") {
+                    taxTypeVal = "IGST";
+                } else if (gstType === "NONE" || gstType === "EXPORT" || gstType === "SEZ") {
+                    taxTypeVal = "NONE";
+                }
+
+                document.getElementById('tax_type_hidden').value = taxTypeVal;
+                document.getElementById('tax_type_display').value = 
+                    (taxTypeVal === "GST") ? "CGST+SGST (18%)" : 
+                    (taxTypeVal === "IGST" ? "IGST (18%)" : "No Tax (0%)");
+            }
+
+            // 3. Map Primary Service
+            const serviceId = opt.dataset.serviceId;
+            const servRef = document.getElementById('serv_ref_' + serviceId);
+            if (servRef) {
+                document.getElementById('main_service_id').value = serviceId;
+                document.getElementById('service_display').value = servRef.dataset.sname;
+            }
+
+            // 4. Load Slabs
+            const slabs = JSON.parse(opt.dataset.slabs || '[]');
+            let matchedAmount = null;
+
+            slabs.forEach(s => {
+                let o = document.createElement('option');
+                o.value = s.name;
+                o.text = `${s.name} (₹${parseFloat(s.amount).toLocaleString()})`;
+                o.setAttribute('data-amount', s.amount);
+                if (s.name === savedSlabName) {
+                    o.selected = true;
+                    matchedAmount = s.amount;
+                }
+                slabSelect.add(o);
+            });
+
+            if (matchedAmount !== null) {
+                const firstAmtInput = serviceRows.querySelector('.line-amount');
+                if (firstAmtInput) firstAmtInput.value = parseFloat(matchedAmount).toFixed(2);
+            }
+
+            calculateTotal();
+        }
+    });
+
+    slabSelect.addEventListener('change', function() {
+        const opt = this.options[this.selectedIndex];
+        const amount = opt.getAttribute('data-amount');
+        document.getElementById('linked_slab_name').value = opt.value;
+        if (amount) {
+            const firstAmtInput = serviceRows.querySelector('.line-amount');
+            if (firstAmtInput) {
+                firstAmtInput.value = parseFloat(amount).toFixed(2);
+                calculateTotal();
+            }
+        }
+    });
+
+    window.calculateTotal = function() {
+        let subtotal = 0;
+        document.querySelectorAll('.line-amount').forEach(input => {
+            subtotal += parseFloat(input.value || 0);
+        });
+
+        const taxType = document.getElementById('tax_type_hidden').value;
+        let taxPercent = (taxType === 'NONE') ? 0 : 0.18;
+        let taxAmount = subtotal * taxPercent;
+        let grandTotal = subtotal + taxAmount;
+
+        document.getElementById('display_subtotal').innerText = subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+        document.getElementById('display_tax').innerText = taxAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+        document.getElementById('display_total').innerText = grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+        document.getElementById('final_total_hidden').value = grandTotal.toFixed(2);
+        
+        const taxLabel = document.getElementById('tax_label_ui');
+        if (taxLabel) {
+            taxLabel.innerText = (taxType === "GST") ? "Tax (CGST+SGST 18%)" : 
+                                 (taxType === "IGST" ? "Tax (IGST 18%)" : "Tax (0%)");
+        }
+    };
+
+    serviceRows.addEventListener('input', (e) => { if(e.target.classList.contains('line-amount')) calculateTotal(); });
+    
+    if(contractSelect.value) {
+        $('#contract_select').trigger('change');
+    }
+});
+
+function updatePrintPreview() {
+    const custId = document.getElementById('customer_id_hidden').value;
+    const custRef = document.getElementById('cust_ref_' + custId);
+    
+    // Get the subtotal from the UI and clean it (remove commas)
+    const rawAmountStr = document.getElementById('display_subtotal').innerText.replace(/,/g, '');
+    const baseAmount = parseFloat(rawAmountStr) || 0;
+    
+    // 1. Header Information
+    document.getElementById('p_invoice_no').innerText = document.querySelector('input[name="invoice_number"]').value || "---";
+    document.getElementById('p_invoice_date').innerText = document.querySelector('input[name="invoice_date"]').value || "---";
+    document.getElementById('p_customer_name').innerText = custRef ? custRef.dataset.cname : "---";
+    document.getElementById('p_customer_gst').innerText = (custRef ? custRef.dataset.gstNumber : "") || "N/A";
+    document.getElementById('p_curr').innerText = (custRef ? (custRef.dataset.currency || "INR") : "INR");
+
+    // 2. Vertical Address Logic (REPLACED DUPLICATE)
+    if (custRef) {
+        const addr = custRef.dataset.address || "";
+        const city = custRef.dataset.city || "";
+        const state = custRef.dataset.state || "";
+        const pincode = custRef.dataset.pincode || "";
+        const country = custRef.dataset.country || "India";
+
+        let addressHTML = "";
+        if (addr) addressHTML += addr + "<br>";
+        if (city || state) {
+            let cityState = city;
+            if (city && state) cityState += ", " + state;
+            else if (state) cityState = state;
+            addressHTML += cityState + "<br>";
+        }
+        addressHTML += country + (pincode ? " – " + pincode : "");
+        document.getElementById('p_customer_address').innerHTML = addressHTML;
+    } else {
+        document.getElementById('p_customer_address').innerHTML = "---";
+    }
+
+    // 3. Tax Calculation Logic
+    // Normalize taxType to Uppercase from the hidden field or dataset
+    const rawTaxType = document.getElementById('tax_type_hidden').value || (custRef ? custRef.dataset.gstType : "");
+    const taxType = (rawTaxType || "").toUpperCase().trim();
+
+    let cgstVal = 0, sgstVal = 0, igstVal = 0;
+
+    if (taxType === 'GST') {
+        cgstVal = baseAmount * 0.09;
+        sgstVal = baseAmount * 0.09;
+    } else if (taxType === 'IGST') {
+        igstVal = baseAmount * 0.18;
+    }
+    // 'NONE', 'EXPORT', 'SEZ' results in 0
+
+    const totalTaxAmt = cgstVal + sgstVal + igstVal;
+    const inclusiveTotal = (baseAmount + totalTaxAmt).toFixed(2);
+
+    // 4. Build Table Rows
+    let descHTML = ""; 
+    let amtHTML = "";
+
+    const addLine = (desc, amt = "", isDisclaimer = false) => {
+        const heightStyle = isDisclaimer ? "min-height: 1.2em;" : "height: 1.6em;";
+        descHTML += `<div style="${heightStyle} overflow: hidden; margin-bottom: 2px;">${desc}</div>`;
+        amtHTML += `<div style="${heightStyle} text-align: right; margin-bottom: 2px;">${amt}</div>`;
+    };
+
+    const serviceTitle = document.getElementById('service_display').value || 'Service';
+    const milestoneTitle = document.getElementById('slab_select').value || 'Contract Milestone';
+
+    addLine(`<b style="font-size: 11pt;">${serviceTitle}</b>`, baseAmount.toFixed(2));
+    addLine(`<span>Milestone: ${milestoneTitle}</span>`, "");
+    addLine("&nbsp;", ""); 
+
+    // Add Tax Lines
+    addLine(`Central GST [CGST] - 9%`, cgstVal > 0 ? cgstVal.toFixed(2) : "0.00");
+    addLine(`State GST [SGST] - 9%`, sgstVal > 0 ? sgstVal.toFixed(2) : "0.00");
+    addLine(`Integrated GST [IGST] - 18%`, igstVal > 0 ? igstVal.toFixed(2) : "0.00");
+
+    // If No Tax, show disclaimer
+    if (totalTaxAmt === 0) {
+        const disclaimer = (custRef ? custRef.dataset.disclaimer : "") || "";
+        if (disclaimer) {
+            addLine(`<div style="font-size: 9pt; line-height: 1.1; padding-right: 5px; color: #555;">${disclaimer}</div>`, "", true);
+        }
+    }
+
+    // 5. Update Preview Modal
+    document.getElementById('p_description').innerHTML = descHTML;
+    document.getElementById('p_amount_col').innerHTML = amtHTML;
+
+    if(document.getElementById('p_subtotal_final')) document.getElementById('p_subtotal_final').innerText = baseAmount.toLocaleString('en-IN', {minimumFractionDigits: 2});
+    if(document.getElementById('p_total_final')) document.getElementById('p_total_final').innerText = parseFloat(inclusiveTotal).toLocaleString('en-IN', {minimumFractionDigits: 2});
+}
+</script>
+
+{% include 'invoice_bill.html' %}
+{% endblock %}

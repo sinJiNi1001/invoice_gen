@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid" style="font-family: 'Calibri', sans-serif;">
+    {# --- MACRO DEFINITION --- #}
+    {% macro render_invoice_accordion_row(inv, prefix) %}
+    
+    {# 1. Identify the Currency Code from linked tables #}
+    {% set c_code = 'INR' %}
+    {% if inv.project and inv.project.currency %}
+        {% set c_code = inv.project.currency %}
+    {% elif inv.contract and inv.contract.currency %}
+        {% set c_code = inv.contract.currency %}
+    {% elif inv.customer and inv.customer.currency %}
+        {% set c_code = inv.customer.currency %}
+    {% endif %}
+
+    {# 2. Map that Code to a Symbol #}
+    {% set symbol = '₹' %}
+    {% if c_code == 'USD' %}{% set symbol = '$' %}
+    {% elif c_code == 'GBP' %}{% set symbol = '£' %}
+    {% elif c_code == 'EUR' %}{% set symbol = '€' %}
+    {% elif c_code == 'SGD' %}{% set symbol = 'S$' %}
+    {% elif c_code == 'CAD' %}{% set symbol = 'C$' %}
+    {% elif c_code == 'AUD' %}{% set symbol = 'A$' %}
+    {% elif c_code == 'JPY' or c_code == 'CNY' %}{% set symbol = '¥' %}
+    {% elif c_code == 'AED' %}{% set symbol = 'د.إ' %}
+    {% elif c_code != 'INR' %}{% set symbol = c_code ~ ' ' %}
+    {% endif %}
+
+    <div class="accordion-item shadow-sm mb-3 border-0 rounded overflow-hidden">
+        <h2 class="accordion-header" id="heading{{ prefix }}{{ inv.id }}">
+            <div class="d-flex w-100 align-items-stretch">
+                <button class="accordion-button collapsed bg-white" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ prefix }}{{ inv.id }}">
+                    <div class="d-flex align-items-center w-100">
+                        <div class="rounded-circle {% if inv.status == 'Paid' %}bg-success{% elif inv.status == 'Unpaid' or inv.status == 'Overdue' %}bg-danger{% else %}bg-info{% endif %} text-white d-flex justify-content-center align-items-center me-3 fw-bold" 
+                             style="width: 40px; height: 40px; min-width: 40px;">
+                            {% if inv.contract_id %}
+                                <i class="fa-solid fa-file-contract"></i>
+                            {% else %}
+                                <i class="fa-solid fa-file-invoice-dollar"></i>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="me-auto">
+                            <div class="fw-bold text-dark">{{ inv.invoice_number }}</div>
+                            <small class="text-muted">
+                                <i class="fa-solid fa-building me-1"></i>{{ inv.customer.company_name if inv.customer else 'No Customer' }}
+                                {% if inv.contract_id %}
+                                    <span class="badge bg-dark extra-small ms-1" style="font-size: 0.6rem;">CONTRACT</span>
+                                {% endif %}
+                            </small>
+                        </div>
+                        
+                        <div class="d-none d-md-flex align-items-center me-3">
+                            <span class="badge bg-light text-primary border me-2">
+                                {{ symbol }}{{ "{:,.2f}".format(inv.total_amount or 0) }}
+                            </span>
+                            <span class="badge 
+                                {% if inv.status == 'Paid' %}bg-success
+                                {% elif inv.status == 'Unpaid' %}bg-danger
+                                {% elif inv.status == 'Partially Paid' %}bg-warning text-dark
+                                {% elif inv.status == 'Draft' %}bg-secondary
+                                {% else %}bg-info{% endif %}">
+                                {{ inv.status }}
+                            </span>
+                        </div>
+                    </div>
+                </button>
+
+                <div class="bg-white border-start d-flex align-items-center px-3">
+                    {% set edit_url = url_for('contract_invoice', id=inv.id) if inv.contract_id else url_for('edit_invoice', id=inv.id) %}
+                    <a href="{{ edit_url }}" class="btn btn-sm btn-outline-primary text-nowrap">
+                        <i class="fa-solid fa-pen me-1"></i>Edit
+                    </a>
+                </div>
+            </div>
+        </h2>
+        
+        <div id="collapse{{ prefix }}{{ inv.id }}" class="accordion-collapse collapse" data-bs-parent="#accordion{{ prefix }}">
+            <div class="accordion-body bg-light border-top">
+                <div class="row">
+                    <div class="col-md-4 border-end">
+                        <h6 class="text-uppercase text-muted extra-small fw-bold mb-3">Billing Details</h6>
+                        <div class="row mb-2 g-0">
+                            <div class="col-5 text-muted small">{{ 'Contract' if inv.contract_id else 'Project' }}</div>
+                            <div class="col-7 small fw-bold text-dark">: {{ (inv.contract.contract_name if inv.contract else 'N/A') if inv.contract_id else (inv.project.project_name if inv.project else 'N/A') }}</div>
+                        </div>
+                        <div class="row mb-2 g-0">
+                            <div class="col-5 text-muted small">Date</div>
+                            <div class="col-7 small text-dark">: {{ inv.invoice_date.strftime('%d %b %Y') if inv.invoice_date else '-' }}</div>
+                        </div>
+                        <div class="row mb-2 g-0">
+                            <div class="col-5 text-muted small">Received</div>
+                            <div class="col-7 small text-success fw-bold">: {{ symbol }}{{ "{:,.2f}".format(inv.received_amount or 0) }}</div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4 border-end ps-md-4">
+                        <h6 class="text-uppercase text-muted extra-small fw-bold mb-3">Milestone Progress</h6>
+                        <table class="table table-sm table-borderless mb-0" style="font-size: 0.8rem;">
+                            <thead class="border-bottom">
+                                <tr class="text-muted extra-small">
+                                    <th>NAME</th>
+                                    <th class="text-end">AMOUNT</th>
+                                    <th class="text-center">STATUS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if inv.slabs %}
+                                    {% for slab in inv.slabs %}
+                                    <tr class="align-middle">
+                                        <td class="fw-bold text-dark">{{ slab.slab_name }}</td>
+                                        <td class="text-end text-nowrap">{{ symbol }}{{ "{:,.2f}".format(slab.amount) }}</td>
+                                        <td class="text-center">
+                                            {% if inv.status == 'Paid' %}
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size: 0.65rem;">CLEARED</span>
+                                            {% else %}
+                                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle" style="font-size: 0.65rem;">BILLED</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% elif inv.slab_name %}
+                                    <tr class="align-middle">
+                                        <td class="fw-bold text-dark">{{ inv.slab_name }}</td>
+                                        <td class="text-end text-nowrap">{{ symbol }}{{ "{:,.2f}".format(inv.total_amount) }}</td>
+                                        <td class="text-center">
+                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 0.65rem;">RAISED</span>
+                                        </td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted py-3 small">No slabs linked</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="col-md-4 ps-md-4">
+                        <h6 class="text-uppercase text-muted extra-small fw-bold mb-3">Balance Summary</h6>
+                        <div class="p-3 bg-white rounded border text-center shadow-sm">
+                            <div class="row">
+                                <div class="col-6 border-end">
+                                    <div class="extra-small text-muted text-uppercase">Total Amount</div>
+                                    <div class="h6 mb-0">{{ symbol }}{{ "{:,.2f}".format(inv.total_amount or 0) }}</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="extra-small text-muted text-uppercase">Current Due</div>
+                                    <div class="h6 mb-0 text-danger">{{ symbol }}{{ "{:,.2f}".format((inv.total_amount or 0) - (inv.received_amount or 0)) }}</div>
+                                </div>
+                            </div>
+                            <hr class="my-2">
+                            <div class="d-flex justify-content-center gap-2">
+                                <a href="{{ edit_url }}" class="btn btn-xs btn-light border p-1 px-2 small"><i class="fa-solid fa-print"></i></a>
+                                <a href="mailto:{{ inv.customer.email if inv.customer else '' }}" class="btn btn-xs btn-outline-success p-1 px-2 small"><i class="fa-solid fa-envelope"></i></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endmacro %}
+
+    {# --- HEADER & 3-PART FILTER --- #}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="text-primary mb-0">Invoice Registry</h2>
+            <p class="text-muted small">Filter: <span class="fw-bold text-dark">{{ display_label if display_label else now.strftime('%B %Y') }}</span></p>
+        </div>
+        
+        <div class="d-flex gap-2 mt-3">
+            <form class="d-flex gap-2 align-items-center" method="GET" action="{{ url_for('edit_list') }}">
+                <select name="invoice_type" class="form-select form-select-sm fw-bold border-primary" style="width: 150px; font-family: 'Calibri', sans-serif;" onchange="this.form.submit()">
+                    <option value="all" {% if not current_filters.invoice_type or current_filters.invoice_type == 'all' %}selected{% endif %}>🔍 Filter by Type</option>
+                    <option value="project" {% if current_filters.invoice_type == 'project' %}selected{% endif %}>📁 Project Invoices</option>
+                    <option value="contract" {% if current_filters.invoice_type == 'contract' %}selected{% endif %}>📜 Contract Invoices</option>
+                </select>
+
+                <input type="number" name="day" class="form-control form-control-sm" placeholder="DD" style="width: 50px;" value="{{ current_filters.day or '' }}">
+                
+                <select name="month" class="form-select form-select-sm" style="width: 100px;">
+                    <option value="">Month</option>
+                    {% for m in range(1, 13) %}
+                    <option value="{{ m }}" {% if current_filters.month == m|string or current_filters.month == m %}selected{% endif %}>
+                        {{ ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m-1] }}
+                    </option>
+                    {% endfor %}
+                </select>
+
+                <input type="number" name="year" class="form-control form-control-sm" placeholder="YYYY" style="width: 80px;" value="{{ current_filters.year or now.year }}">
+                
+                <button type="submit" class="btn btn-sm btn-primary px-3">Apply</button>
+                
+                <div class="d-flex gap-2 ms-4">
+                    <a href="{{ url_for('create_invoice') }}" class="btn btn-sm btn-success shadow-sm">
+                        <i class="fa-solid fa-diagram-project me-1"></i> + Project
+                    </a>
+                    <a href="{{ url_for('contract_invoice') }}" class="btn btn-sm btn-dark shadow-sm">
+                        <i class="fa-solid fa-file-contract me-1"></i> + Contract
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {# --- TABS --- #}
+    <ul class="nav nav-tabs mb-4 border-0" id="invoiceTab" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active fw-bold border-0 text-uppercase small" data-bs-toggle="tab" data-bs-target="#all-pane" type="button">All ({{ now.strftime('%B') }})</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link fw-bold border-0 text-uppercase small" data-bs-toggle="tab" data-bs-target="#new-pane" type="button">New Created</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link fw-bold border-0 text-uppercase small" data-bs-toggle="tab" data-bs-target="#edit-pane" type="button">Action Required</button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="invoiceTabContent">
+        <div class="tab-pane fade show active" id="all-pane">
+            <div class="accordion" id="accordionAll">
+                {% for inv in all_invoices %}
+                    {{ render_invoice_accordion_row(inv, 'All') }}
+                {% else %}
+                    <div class="text-center py-5 text-muted border rounded bg-white">No invoices found for this selection.</div>
+                {% endfor %}
+            </div>
+            
+            {# --- UPDATED PAGINATION --- #}
+            {% if total_pages > 1 %}
+            <div class="d-flex justify-content-between align-items-center bg-white border rounded p-3 mt-4 shadow-sm">
+                <span class="text-muted small">
+                    Showing entries for <strong>{{ display_label }}</strong>
+                </span>
+                <nav>
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+                            <a class="page-link" href="{{ url_for('edit_list', page=page-1, invoice_type=current_filters.invoice_type, day=current_filters.day, month=current_filters.month, year=current_filters.year) }}">
+                                Previous
+                            </a>
+                        </li>
+                        
+                        <li class="page-item active"><span class="page-link px-4">{{ page }} / {{ total_pages }}</span></li>
+
+                        <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+                            <a class="page-link" href="{{ url_for('edit_list', page=page+1, invoice_type=current_filters.invoice_type, day=current_filters.day, month=current_filters.month, year=current_filters.year) }}">
+                                Next
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="tab-pane fade" id="new-pane">
+            <div class="alert alert-info py-2 small shadow-sm"><i class="fa-solid fa-circle-info me-2"></i>Showing new invoices created in <strong>{{ now.strftime('%B %Y') }}</strong></div>
+            <div class="accordion" id="accordionNew">
+                {% for inv in new_invoices %}
+                    {{ render_invoice_accordion_row(inv, 'New') }}
+                {% else %}
+                    <div class="text-center py-5 text-muted border rounded bg-white">No new invoices created this month.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="edit-pane">
+            <div class="alert alert-warning py-2 small shadow-sm"><i class="fa-solid fa-clock-rotate-left me-2"></i>Showing unpaid/partial invoices for <strong>{{ now.strftime('%B %Y') }}</strong></div>
+            <div class="accordion" id="accordionEdit">
+                {% for inv in edit_invoices %}
+                    {{ render_invoice_accordion_row(inv, 'Edit') }}
+                {% else %}
+                    <div class="text-center py-5 text-muted border rounded bg-white">All current month invoices are cleared!</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .extra-small { font-size: 0.7rem; font-weight: bold; }
+    .nav-tabs .nav-link { color: #6c757d; border-bottom: 2px solid transparent !important; margin-right: 10px; font-family: 'Calibri', sans-serif; }
+    .nav-tabs .nav-link.active { color: #0d6efd !important; border-bottom: 2px solid #0d6efd !important; background: none; }
+    .accordion-button:not(.collapsed) { background-color: #f8f9fa; color: #0d6efd; box-shadow: none; }
+    .page-link { border-radius: 5px !important; margin: 0 3px; font-family: 'Calibri', sans-serif; }
+    .form-select, .form-control, .btn { font-family: 'Calibri', sans-serif; }
+</style>
+{% endblock %}
